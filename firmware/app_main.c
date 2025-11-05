@@ -22,10 +22,11 @@
 #include "timebase.h"
 
 // Checkpoint control (uncomment to enable specific checkpoint tests)
-#define CHECKPOINT_3_1  // CRC-CCITT test vectors
+//#define CHECKPOINT_3_1  // CRC-CCITT test vectors
+#define CHECKPOINT_3_2  // SLIP codec
 
 // Test mode
-#ifdef CHECKPOINT_3_1
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2)
 #include "test_mode.h"
 #endif
 
@@ -115,6 +116,38 @@ int main(void) {
 
     // Run CRC test vectors
     test_crc_vectors();
+
+    printf("\n");
+    printf("Test complete. Halting in checkpoint mode.\n");
+    printf("Heartbeat LED will continue blinking.\n");
+    printf("\n");
+
+    // Halt here - just blink LED to show we're alive
+    while (1) {
+        static uint32_t blink_counter = 0;
+        if (blink_counter++ >= 500) {
+            blink_counter = 0;
+            static bool led = false;
+            led = !led;
+            gpio_set_heartbeat_led(led);
+        }
+        sleep_ms(1);
+    }
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // CHECKPOINT 3.2: SLIP Codec Test Mode
+    // ========================================================================
+    #ifdef CHECKPOINT_3_2
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 3.2: SLIP CODEC TEST MODE                     ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+
+    // Run SLIP codec tests
+    test_slip_codec();
 
     printf("\n");
     printf("Test complete. Halting in checkpoint mode.\n");

@@ -8,6 +8,7 @@ add_executable(nrwa_t6_emulator
     platform/timebase.c
     # Drivers (Phase 3)
     drivers/crc_ccitt.c
+    drivers/slip.c
     # Test mode
     test_mode.c
 )

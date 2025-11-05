@@ -9,7 +9,7 @@
 
 // Include checkpoint-specific modules
 #include "crc_ccitt.h"
-// #include "slip.h"       // Checkpoint 3.2
+#include "slip.h"       // Checkpoint 3.2
 // #include "rs485_uart.h" // Checkpoint 3.3
 // #include "nsp.h"        // Checkpoint 3.4
 
@@ -114,13 +114,215 @@ void test_crc_vectors(void) {
 }
 
 // ============================================================================
-// Checkpoint 3.2: SLIP Codec (future)
+// Checkpoint 3.2: SLIP Codec
 // ============================================================================
 
+/**
+ * @brief Test SLIP encoder and decoder with various test cases
+ *
+ * Validates:
+ * - Empty frames
+ * - Regular data (no escaping needed)
+ * - Data containing END bytes
+ * - Data containing ESC bytes
+ * - Data containing both END and ESC bytes
+ * - Round-trip encode/decode
+ * - Streaming decode with byte-by-byte input
+ */
 void test_slip_codec(void) {
     TEST_SECTION("Checkpoint 3.2: SLIP Codec");
-    // Implementation in future checkpoint
-    printf("Not yet implemented.\n");
+
+    bool all_passed = true;
+    uint8_t encoded[256];
+    uint8_t decoded[256];
+    size_t encoded_len, decoded_len;
+    slip_decoder_t decoder;
+
+    // Test 1: Empty frame
+    printf("\nTest 1: Empty frame\n");
+    {
+        bool encode_ok = slip_encode(NULL, 0, encoded, &encoded_len);
+        printf("  Encoded %zu bytes: ", encoded_len);
+        for (size_t i = 0; i < encoded_len; i++) {
+            printf("0x%02X ", encoded[i]);
+        }
+        printf("\n");
+
+        // Should produce: END END
+        bool test1_pass = encode_ok && (encoded_len == 2) &&
+                         (encoded[0] == SLIP_END) && (encoded[1] == SLIP_END);
+        TEST_RESULT("Test 1 (empty frame)", test1_pass);
+        all_passed &= test1_pass;
+    }
+
+    // Test 2: Simple data (no escaping)
+    printf("\nTest 2: Simple data {0x01, 0x02, 0x03}\n");
+    {
+        uint8_t test_data[] = {0x01, 0x02, 0x03};
+        bool encode_ok = slip_encode(test_data, 3, encoded, &encoded_len);
+        printf("  Encoded %zu bytes: ", encoded_len);
+        for (size_t i = 0; i < encoded_len; i++) {
+            printf("0x%02X ", encoded[i]);
+        }
+        printf("\n");
+
+        // Should produce: END 0x01 0x02 0x03 END
+        bool test2_pass = encode_ok && (encoded_len == 5) &&
+                         (encoded[0] == SLIP_END) &&
+                         (encoded[1] == 0x01) && (encoded[2] == 0x02) && (encoded[3] == 0x03) &&
+                         (encoded[4] == SLIP_END);
+        TEST_RESULT("Test 2 (simple data)", test2_pass);
+        all_passed &= test2_pass;
+    }
+
+    // Test 3: Data containing END byte
+    printf("\nTest 3: Data with END byte {0x01, 0xC0, 0x02}\n");
+    {
+        uint8_t test_data[] = {0x01, SLIP_END, 0x02};
+        bool encode_ok = slip_encode(test_data, 3, encoded, &encoded_len);
+        printf("  Encoded %zu bytes: ", encoded_len);
+        for (size_t i = 0; i < encoded_len; i++) {
+            printf("0x%02X ", encoded[i]);
+        }
+        printf("\n");
+
+        // Should produce: END 0x01 ESC ESC_END 0x02 END (6 bytes)
+        bool test3_pass = encode_ok && (encoded_len == 6) &&
+                         (encoded[0] == SLIP_END) &&
+                         (encoded[1] == 0x01) &&
+                         (encoded[2] == SLIP_ESC) && (encoded[3] == SLIP_ESC_END) &&
+                         (encoded[4] == 0x02) &&
+                         (encoded[5] == SLIP_END);
+        TEST_RESULT("Test 3 (END byte escaping)", test3_pass);
+        all_passed &= test3_pass;
+    }
+
+    // Test 4: Data containing ESC byte
+    printf("\nTest 4: Data with ESC byte {0x01, 0xDB, 0x02}\n");
+    {
+        uint8_t test_data[] = {0x01, SLIP_ESC, 0x02};
+        bool encode_ok = slip_encode(test_data, 3, encoded, &encoded_len);
+        printf("  Encoded %zu bytes: ", encoded_len);
+        for (size_t i = 0; i < encoded_len; i++) {
+            printf("0x%02X ", encoded[i]);
+        }
+        printf("\n");
+
+        // Should produce: END 0x01 ESC ESC_ESC 0x02 END (6 bytes)
+        bool test4_pass = encode_ok && (encoded_len == 6) &&
+                         (encoded[0] == SLIP_END) &&
+                         (encoded[1] == 0x01) &&
+                         (encoded[2] == SLIP_ESC) && (encoded[3] == SLIP_ESC_ESC) &&
+                         (encoded[4] == 0x02) &&
+                         (encoded[5] == SLIP_END);
+        TEST_RESULT("Test 4 (ESC byte escaping)", test4_pass);
+        all_passed &= test4_pass;
+    }
+
+    // Test 5: Data with both END and ESC
+    printf("\nTest 5: Data with END and ESC {0xC0, 0xDB, 0x55}\n");
+    {
+        uint8_t test_data[] = {SLIP_END, SLIP_ESC, 0x55};
+        bool encode_ok = slip_encode(test_data, 3, encoded, &encoded_len);
+        printf("  Encoded %zu bytes: ", encoded_len);
+        for (size_t i = 0; i < encoded_len; i++) {
+            printf("0x%02X ", encoded[i]);
+        }
+        printf("\n");
+
+        // Should produce: END ESC ESC_END ESC ESC_ESC 0x55 END (7 bytes)
+        bool test5_pass = encode_ok && (encoded_len == 7) &&
+                         (encoded[0] == SLIP_END) &&
+                         (encoded[1] == SLIP_ESC) && (encoded[2] == SLIP_ESC_END) &&
+                         (encoded[3] == SLIP_ESC) && (encoded[4] == SLIP_ESC_ESC) &&
+                         (encoded[5] == 0x55) &&
+                         (encoded[6] == SLIP_END);
+        TEST_RESULT("Test 5 (multiple escapes)", test5_pass);
+        all_passed &= test5_pass;
+    }
+
+    // Test 6: Round-trip encode/decode
+    printf("\nTest 6: Round-trip encode/decode\n");
+    {
+        uint8_t original[] = {0x01, 0xC0, 0x02, 0xDB, 0x03, 0xAA, 0xBB};
+        size_t original_len = sizeof(original);
+
+        // Encode
+        slip_encode(original, original_len, encoded, &encoded_len);
+
+        // Decode byte-by-byte
+        slip_decoder_init(&decoder);
+        bool frame_received = false;
+        for (size_t i = 0; i < encoded_len; i++) {
+            if (slip_decode_byte(&decoder, encoded[i], decoded, &decoded_len)) {
+                frame_received = true;
+                break;
+            }
+        }
+
+        printf("  Original: ");
+        for (size_t i = 0; i < original_len; i++) {
+            printf("0x%02X ", original[i]);
+        }
+        printf("\n");
+        printf("  Decoded:  ");
+        for (size_t i = 0; i < decoded_len; i++) {
+            printf("0x%02X ", decoded[i]);
+        }
+        printf("\n");
+
+        // Verify round-trip
+        bool test6_pass = frame_received && (decoded_len == original_len) &&
+                         (memcmp(original, decoded, original_len) == 0);
+        TEST_RESULT("Test 6 (round-trip)", test6_pass);
+        all_passed &= test6_pass;
+    }
+
+    // Test 7: Streaming decoder with multiple frames
+    printf("\nTest 7: Streaming decoder - back-to-back frames\n");
+    {
+        // Two frames: {0x01, 0x02} and {0x03, 0x04}
+        uint8_t frame1[] = {0x01, 0x02};
+        uint8_t frame2[] = {0x03, 0x04};
+        uint8_t encoded1[16], encoded2[16];
+        size_t enc1_len, enc2_len;
+
+        slip_encode(frame1, 2, encoded1, &enc1_len);
+        slip_encode(frame2, 2, encoded2, &enc2_len);
+
+        // Combine into stream (second frame starts immediately after first)
+        uint8_t stream[32];
+        memcpy(stream, encoded1, enc1_len);
+        memcpy(stream + enc1_len, encoded2, enc2_len);
+        size_t stream_len = enc1_len + enc2_len;
+
+        // Decode stream
+        slip_decoder_init(&decoder);
+        int frames_received = 0;
+        for (size_t i = 0; i < stream_len; i++) {
+            if (slip_decode_byte(&decoder, stream[i], decoded, &decoded_len)) {
+                frames_received++;
+                printf("  Frame %d received: ", frames_received);
+                for (size_t j = 0; j < decoded_len; j++) {
+                    printf("0x%02X ", decoded[j]);
+                }
+                printf("\n");
+            }
+        }
+
+        bool test7_pass = (frames_received == 2);
+        TEST_RESULT("Test 7 (streaming)", test7_pass);
+        all_passed &= test7_pass;
+    }
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL SLIP TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME SLIP TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
 }
 
 // ============================================================================
