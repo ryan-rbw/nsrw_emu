@@ -319,7 +319,28 @@ cp build/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 3. Drag `nrwa_t6_emulator.uf2` to the `RPI-RP2` drive
 4. The drive will disappear automatically when flashing completes
 
-**Method 3: Using picotool (Advanced)**
+### Method 3: Using load.sh Script (Recommended for Development)
+
+```bash
+# From project root - automatic flash with picotool
+./load.sh
+
+# With verification
+./load.sh --verify
+
+# Show Pico info without flashing
+./load.sh --info
+```
+
+The script will:
+
+- Check for Pico in BOOTSEL mode
+- Show device information
+- Flash the firmware
+- Optionally verify the flash
+- Reboot the Pico
+
+### Method 4: Using picotool Directly (Manual)
 
 ```bash
 # Flash directly (Pico must be in BOOTSEL mode)
@@ -712,14 +733,33 @@ sudo usermod -a -G dialout $USER
 
 ### Build and Flash Workflow
 
+#### Option 1: Using load.sh (Recommended for Development)
+
 ```bash
 # Navigate to project
 cd /home/rwhite/src/nsrw_emu
 
-# Build firmware (recommended method)
+# Build firmware
 ./build.sh
 
-# Flash (Pico in BOOTSEL mode)
+# Flash with picotool (Pico in BOOTSEL mode)
+./load.sh
+
+# Connect console
+screen /dev/ttyACM0 115200
+# Exit screen: Ctrl-A, then K, then Y
+```
+
+#### Option 2: Using USB Mass Storage
+
+```bash
+# Navigate to project
+cd /home/rwhite/src/nsrw_emu
+
+# Build firmware
+./build.sh
+
+# Flash via USB drive (Pico in BOOTSEL mode)
 cp build/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 
 # Connect console
