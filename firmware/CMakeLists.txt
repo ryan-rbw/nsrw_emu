@@ -3,6 +3,9 @@
 # Main executable
 add_executable(nrwa_t6_emulator
     app_main.c
+    # Platform layer
+    platform/gpio_map.c
+    platform/timebase.c
 )
 
 # Pass version string as compile definition

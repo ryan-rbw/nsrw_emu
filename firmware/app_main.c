@@ -16,6 +16,11 @@
 #include "pico/unique_id.h"
 #include "hardware/watchdog.h"
 
+// Platform layer
+#include "board_pico.h"
+#include "gpio_map.h"
+#include "timebase.h"
+
 // Firmware version (passed from CMake)
 #ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION "v0.1.0-unknown"
@@ -76,14 +81,17 @@ int main(void) {
     // Print startup banner
     print_banner();
 
-    // Initialize onboard LED (GPIO 25 on Pico)
-    const uint LED_PIN = PICO_DEFAULT_LED_PIN;
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
-
     printf("[Core0] Initializing hardware...\n");
 
-    // TODO: Phase 2 - Initialize platform (GPIO, timebase)
+    // Phase 2: Initialize platform layer
+    gpio_init_all();
+    uint8_t device_addr = gpio_read_address();
+    printf("[Core0] Device address: 0x%02X (from ADDR pins)\n", device_addr);
+
+    // Initialize timebase (100 Hz tick for Core1 physics)
+    // Note: Not starting timer yet, will start when Core1 is launched
+    timebase_init(NULL);  // Callback will be set in Core1
+
     // TODO: Phase 3 - Initialize drivers (RS-485, SLIP, NSP)
     // TODO: Phase 8 - Initialize console/TUI
 
@@ -104,24 +112,25 @@ int main(void) {
     bool led_state = false;
 
     while (1) {
-        // Heartbeat blink (1 Hz)
+        // Heartbeat blink (1 Hz) using platform layer
         if (heartbeat_counter++ >= 500) {
             heartbeat_counter = 0;
             led_state = !led_state;
-            gpio_put(LED_PIN, led_state);
+            gpio_set_heartbeat_led(led_state);
         }
 
         // TODO: Phase 3 - Poll RS-485 for incoming NSP packets
         // TODO: Phase 8 - Poll USB-CDC for console input
         // TODO: Phase 9 - Update fault injection scenarios
 
-        // For now, just print a status message periodically
+        // Status message with jitter stats
         static uint32_t status_counter = 0;
         if (status_counter++ >= 5000) {
             status_counter = 0;
-            uint64_t uptime_ms = to_ms_since_boot(get_absolute_time());
-            printf("[Status] Uptime: %llu ms, Heartbeat: %s\n",
-                   uptime_ms, led_state ? "ON" : "OFF");
+            uint32_t uptime_ms = timebase_get_ms();
+            uint32_t jitter_us = timebase_get_max_jitter_us();
+            printf("[Status] Uptime: %u ms, Heartbeat: %s, Max jitter: %u us\n",
+                   uptime_ms, led_state ? "ON" : "OFF", jitter_us);
         }
 
         // Small delay to avoid busy-waiting
