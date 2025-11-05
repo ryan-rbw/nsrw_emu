@@ -270,20 +270,138 @@ screen /dev/ttyACM0 115200
 7. **GPIO init order**: Call `gpio_init_all()` before any GPIO operations
 8. **Timebase init**: Call `timebase_init()` before `timebase_start()`
 
-## Documentation
+## Documentation Workflow (CRITICAL)
 
-- **SPEC.md**: Full specification (NRWA-T6 ICD compatibility)
-- **IMP.md**: Implementation plan (10 phases with acceptance criteria)
-- **PROGRESS.md**: Current status, completed work, metrics (LOC, phases)
-- **README.md**: Build instructions, pin config, troubleshooting
+This project uses **four key documents** that work together. You MUST understand and maintain all of them:
 
-**When completing a phase**: Update PROGRESS.md with:
-1. Change phase status from Pending → Complete
-2. Add "What We Built" section with file list and line counts
-3. Check off acceptance criteria
-4. Add commit hash
-5. Update overall completion percentage
-6. Update metrics (LOC, phases complete)
+### 1. SPEC.md - The Source of Truth
+**Purpose**: Full specification defining what to build
+**When to reference**:
+- Before starting any phase (understand requirements)
+- When implementing protocols (NSP commands, SLIP, CRC)
+- When implementing physics (equations, control modes, protections)
+- When implementing console (table structure, command palette)
+
+**Key sections**:
+- §3: Protocol details (RS-485, SLIP, NSP, CRC)
+- §5: Physics & control emulation (dynamics, modes, protections)
+- §6: NSP commands (8 commands with specific behaviors)
+- §8: Console TUI tables and command palette
+- §9: Error/fault injection JSON schema
+
+**Example**: Implementing CRC? Check SPEC.md:44 for "CCITT, init 0xFFFF, LSB first"
+
+### 2. IMP.md - The Implementation Roadmap
+**Purpose**: Detailed implementation plan with 10 phases
+**When to reference**:
+- Starting a new phase (understand tasks and deliverables)
+- Making design decisions (see §5 Critical Design Decisions)
+- Understanding acceptance criteria for current phase
+- Planning development sequence (§6 Development Sequence)
+
+**Key sections**:
+- §3: Implementation Phases (Phase 1-10 with tasks, deliverables, acceptance)
+- §4: Testing Strategy (unit tests, host integration, HIL)
+- §5: Critical Design Decisions (inter-core comms, timing, SLIP, JSON)
+- §8: Milestones & Success Criteria
+
+**Example**: Starting Phase 3? Check IMP.md:166-216 for CRC/SLIP/RS-485/NSP tasks
+
+### 3. PROGRESS.md - The Live Status Tracker
+**Purpose**: Real-time implementation status and completed work log
+**When to update**: After EVERY phase completion and major milestone
+
+**MANDATORY updates when completing a phase**:
+1. **Overall Progress table**: Change phase status from ⏸️ Pending → ✅ Complete
+2. **Phase section**: Add complete "What We Built" writeup:
+   - List all files created with line counts
+   - Describe features implemented
+   - Check off all acceptance criteria with ✅
+   - Add commit hash(es)
+3. **Metrics section**: Update:
+   - Lines of Code (C): Current / Target / Percentage
+   - Phases Complete: N / 10 / Percentage
+4. **Overall Completion percentage**: Update at top (N/10 phases)
+
+**Example Phase 2 completion**:
+```markdown
+## Phase 2: Platform Layer ✅ COMPLETE
+
+**Status**: Complete
+**Completed**: 2025-11-05
+**Commits**: `acee592`
+
+### What We Built
+
+#### 1. Board Configuration ✅
+**File**: [firmware/platform/board_pico.h](firmware/platform/board_pico.h) (155 lines)
+
+Complete pin mapping and hardware configuration:
+- RS-485 UART pins (TX=GP4, RX=GP5, DE=GP6, RE=GP7)
+- Address selection pins (ADDR0=GP10, ADDR1=GP11, ADDR2=GP12)
+...
+
+### Acceptance Criteria
+
+| Criteria | Status | Evidence |
+|----------|--------|----------|
+| Address pins ADDR[2:0] read correctly | ✅ | `gpio_read_address()` implemented |
+| Hardware alarm fires at 100 Hz | ✅ | `timebase.c` ISR configured |
+...
+
+### Files Created
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| platform/board_pico.h | 155 | Pin definitions, constants |
+...
+
+**Total**: 695 lines of platform code
+```
+
+### 4. README.md - The User Guide
+**Purpose**: Build instructions, usage, troubleshooting for end users
+**When to update**: When build process changes or new user-facing features added
+**Generally stable**: Most updates happen during Phase 1 and Phase 8 (console)
+
+## Document Reference Examples
+
+**Scenario 1: Starting Phase 3 (Core Drivers)**
+1. **Read SPEC.md §3**: Understand RS-485, SLIP, NSP, CRC requirements
+2. **Read IMP.md §3.3 (Phase 3)**: Get detailed implementation tasks
+3. **Read PROGRESS.md**: Check current status, understand what's already done
+4. **Implement** the drivers
+5. **Update PROGRESS.md**: Mark Phase 3 complete with full writeup
+6. **Commit** with reference to phase completion
+
+**Scenario 2: Implementing NSP Protocol**
+1. **Read SPEC.md §3.2**: NSP protocol structure, Message Control byte
+2. **Read SPEC.md §6**: NSP commands (0x00-0x0B) and behaviors
+3. **Read IMP.md:195-203**: NSP implementation details (packet layout, dispatch)
+4. **Implement** `nsp.c` following the spec
+5. **Update PROGRESS.md**: Add to Phase 3 completion section
+
+**Scenario 3: Understanding Physics Model**
+1. **Read SPEC.md §5**: Complete physics equations and control modes
+2. **Read IMP.md:250-297**: Implementation approach for device model
+3. **Check PROGRESS.md**: See if Phase 5 is current phase
+4. **Implement** `nss_nrwa_t6_model.c`
+5. **Update PROGRESS.md**: Complete Phase 5 section with details
+
+## PROGRESS.md Update Checklist
+
+Before committing a phase completion, verify PROGRESS.md has:
+
+- [ ] Overall Progress table: Phase marked ✅ Complete
+- [ ] Overall Completion percentage: Updated (e.g., 20% → 30%)
+- [ ] New phase section with "✅ COMPLETE" in title
+- [ ] "What We Built" subsections for each major component
+- [ ] All files listed with line counts in table format
+- [ ] All acceptance criteria checked off with ✅
+- [ ] Commit hash(es) listed
+- [ ] "Next Steps" section pointing to next phase
+- [ ] Metrics table: LOC and Phases Complete updated
+- [ ] Next phase marked 🔄 Next (not ⏸️ Pending)
 
 ## Git Workflow
 
