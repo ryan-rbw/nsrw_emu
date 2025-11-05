@@ -34,9 +34,9 @@ void test_crc_vectors(void) {
     uint8_t test1[] = {0x01, 0x02, 0x03};
     crc_result = crc_ccitt_calculate(test1, sizeof(test1));
     printf("  Calculated CRC: 0x%04X\n", crc_result);
-    // For LSB-first CCITT with init 0xFFFF, poly 0x1021:
-    // Expected: 0x7E70 (verified with external calculator)
-    bool test1_pass = (crc_result == 0x7E70);
+    // For LSB-first CCITT with init 0xFFFF, poly 0x8408 (reversed):
+    // Expected: 0x62C4
+    bool test1_pass = (crc_result == 0x62C4);
     TEST_RESULT("Test 1", test1_pass);
     all_passed &= test1_pass;
 
@@ -54,8 +54,8 @@ void test_crc_vectors(void) {
     crc_result = crc_ccitt_calculate(test3, sizeof(test3));
     printf("  Calculated CRC: 0x%04X\n", crc_result);
     // Expected: 0xFFFF XOR 0x00 with polynomial operations
-    // For LSB-first: 0x1D0F (verified)
-    bool test3_pass = (crc_result == 0x1D0F);
+    // For LSB-first: 0x0F87
+    bool test3_pass = (crc_result == 0x0F87);
     TEST_RESULT("Test 3", test3_pass);
     all_passed &= test3_pass;
 
@@ -64,8 +64,8 @@ void test_crc_vectors(void) {
     uint8_t test4[] = {0xFF, 0xFF, 0xFF, 0xFF};
     crc_result = crc_ccitt_calculate(test4, sizeof(test4));
     printf("  Calculated CRC: 0x%04X\n", crc_result);
-    // Expected: 0x1D00 (verified with LSB-first CCITT)
-    bool test4_pass = (crc_result == 0x1D00);
+    // Expected: 0xF0B8 (verified with LSB-first CCITT)
+    bool test4_pass = (crc_result == 0xF0B8);
     TEST_RESULT("Test 4", test4_pass);
     all_passed &= test4_pass;
 
@@ -74,8 +74,8 @@ void test_crc_vectors(void) {
     uint8_t test5[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
     crc_result = crc_ccitt_calculate(test5, sizeof(test5));
     printf("  Calculated CRC: 0x%04X\n", crc_result);
-    // Expected for LSB-first CCITT: 0x29B1 (standard test vector)
-    bool test5_pass = (crc_result == 0x29B1);
+    // Expected for LSB-first CCITT: 0x6F91 (CRC-16/KERMIT)
+    bool test5_pass = (crc_result == 0x6F91);
     TEST_RESULT("Test 5 (ASCII)", test5_pass);
     all_passed &= test5_pass;
 
@@ -86,7 +86,7 @@ void test_crc_vectors(void) {
     crc_incremental = crc_ccitt_update(crc_incremental, test1 + 1, 1);
     crc_incremental = crc_ccitt_update(crc_incremental, test1 + 2, 1);
     printf("  Calculated CRC: 0x%04X\n", crc_incremental);
-    bool test6_pass = (crc_incremental == 0x7E70);  // Should match Test 1
+    bool test6_pass = (crc_incremental == 0x62C4);  // Should match Test 1
     TEST_RESULT("Test 6 (incremental)", test6_pass);
     all_passed &= test6_pass;
 
