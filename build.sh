@@ -128,13 +128,17 @@ if [ ! -f "firmware/nrwa_t6_emulator.uf2" ]; then
     exit 1
 fi
 
+# Copy UF2 to build root for easy access
+cp firmware/nrwa_t6_emulator.uf2 .
+
 # Show results
 echo ""
 echo -e "${GREEN}=== Build successful ===${NC}"
 echo "Output files:"
-ls -lh firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+echo "  ELF: $(ls -lh firmware/nrwa_t6_emulator.elf | awk '{print $9, "(" $5 ")"}')"
+echo "  UF2: $(ls -lh nrwa_t6_emulator.uf2 | awk '{print $9, "(" $5 ")"}')"
 echo ""
 echo "To flash to Pico:"
 echo "  1. Hold BOOTSEL button and connect Pico via USB"
-echo "  2. cp build/firmware/nrwa_t6_emulator.uf2 /media/\$USER/RPI-RP2/"
+echo "  2. cp build/nrwa_t6_emulator.uf2 /media/\$USER/RPI-RP2/"
 echo ""

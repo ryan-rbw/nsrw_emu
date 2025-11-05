@@ -199,8 +199,12 @@ Converting ELF to UF2...
 
 === Build successful ===
 Output files:
--rwxrwxr-x 1 user user 729K firmware/nrwa_t6_emulator.elf
--rw-rw-r-- 1 user user  72K firmware/nrwa_t6_emulator.uf2
+  ELF: firmware/nrwa_t6_emulator.elf (729K)
+  UF2: nrwa_t6_emulator.uf2 (72K)
+
+To flash to Pico:
+  1. Hold BOOTSEL button and connect Pico via USB
+  2. cp build/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 ```
 
 ### Method 2: Manual Build
@@ -261,11 +265,12 @@ picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 After a successful build, you'll have:
 
 ```bash
+build/nrwa_t6_emulator.uf2           #  72KB flashable image for Pico (READY TO FLASH)
 build/firmware/nrwa_t6_emulator.elf  # 729KB ARM Cortex-M0+ executable
-build/firmware/nrwa_t6_emulator.uf2  #  72KB flashable image for Pico
+build/firmware/nrwa_t6_emulator.uf2  #  72KB UF2 (also in firmware/ subdirectory)
 ```
 
-**The .uf2 file** is what you flash to the Pico.
+**The .uf2 file at `build/nrwa_t6_emulator.uf2`** is what you flash to the Pico. It's copied to the build root for easy access.
 
 ---
 
@@ -301,8 +306,8 @@ ls /run/media/$USER/RPI-RP2
 **Method 1: Command Line (Recommended)**
 
 ```bash
-# From the build directory
-cp firmware/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
+# From project root - UF2 is in build/ for easy access
+cp build/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 
 # The Pico will automatically reboot after copy completes
 ```
@@ -310,18 +315,15 @@ cp firmware/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 **Method 2: File Manager**
 
 1. Open your file manager
-2. Navigate to `build/firmware/`
+2. Navigate to `build/` directory
 3. Drag `nrwa_t6_emulator.uf2` to the `RPI-RP2` drive
 4. The drive will disappear automatically when flashing completes
 
 **Method 3: Using picotool (Advanced)**
 
 ```bash
-# Install picotool (optional)
-sudo apt install picotool
-
 # Flash directly (Pico must be in BOOTSEL mode)
-picotool load firmware/nrwa_t6_emulator.uf2
+picotool load build/nrwa_t6_emulator.uf2
 picotool reboot
 ```
 
@@ -718,7 +720,7 @@ cd /home/rwhite/src/nsrw_emu
 ./build.sh
 
 # Flash (Pico in BOOTSEL mode)
-cp build/firmware/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
+cp build/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 
 # Connect console
 screen /dev/ttyACM0 115200
