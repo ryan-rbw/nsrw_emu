@@ -74,29 +74,59 @@ if [ ! -f "Makefile" ]; then
     cmake ..
 fi
 
-# Patch the Makefile to skip ARM binary execution (workaround for QEMU crash)
-if grep -q "^\s*cd.*&&.*\./nrwa_t6_emulator.elf" firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make 2>/dev/null; then
-    echo "Patching Makefile to skip ARM binary execution..."
-    sed -i 's|^\(\s*cd.*/firmware && \)\./nrwa_t6_emulator.elf|\1echo "Skipping ARM execution (cross-compiling)"|' \
-        firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make
-fi
-
-# Build
+# Build (this may trigger CMake reconfiguration)
 echo "Building firmware..."
-make -j$(nproc)
+set +e  # Temporarily allow errors
+make -j$(nproc) > build.log 2>&1
+BUILD_RESULT=$?
+set -e  # Re-enable exit on error
 
-# Convert to UF2
-if [ -f "firmware/nrwa_t6_emulator.elf" ]; then
-    echo "Converting ELF to UF2..."
-    if [ -f "_deps/picotool/picotool" ]; then
-        _deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+# Check if build failed
+if [ $BUILD_RESULT -ne 0 ]; then
+    # Show the error
+    cat build.log
+
+    # Check if it's the QEMU crash
+    if grep -q "qemu.*Segmentation fault" build.log; then
+        echo ""
+        echo -e "${YELLOW}QEMU crash detected - applying Makefile patch and retrying...${NC}"
+
+        # Patch the Makefile to skip ARM binary execution
+        if grep -q "^\s*cd.*&&.*\./nrwa_t6_emulator.elf" firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make 2>/dev/null; then
+            sed -i 's|^\(\s*cd.*/firmware && \)\./nrwa_t6_emulator.elf|\1echo "Skipping ARM execution (cross-compiling)"|' \
+                firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make
+
+            # Retry build
+            echo "Retrying build..."
+            make -j$(nproc)
+            rm -f build.log
+        else
+            echo -e "${RED}ERROR: Could not find ARM execution command to patch${NC}"
+            rm -f build.log
+            exit 1
+        fi
     else
-        echo "ERROR: picotool not found"
-        echo "ELF file created but UF2 conversion failed"
+        # Different error - exit
+        echo -e "${RED}Build failed${NC}"
+        rm -f build.log
         exit 1
     fi
 else
-    echo "ERROR: ELF file not found"
+    # Build succeeded - clean up
+    rm -f build.log
+fi
+
+# Verify build outputs
+echo ""
+if [ ! -f "firmware/nrwa_t6_emulator.elf" ]; then
+    echo -e "${RED}ERROR: ELF file not found${NC}"
+    exit 1
+fi
+
+if [ ! -f "firmware/nrwa_t6_emulator.uf2" ]; then
+    echo -e "${RED}ERROR: UF2 file not found${NC}"
+    echo "Build succeeded but UF2 conversion failed"
+    echo "ELF file is available at: build/firmware/nrwa_t6_emulator.elf"
     exit 1
 fi
 
