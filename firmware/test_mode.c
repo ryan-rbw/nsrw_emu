@@ -6,11 +6,12 @@
 #include "test_mode.h"
 #include <stdio.h>
 #include <string.h>
+#include "pico/time.h"
 
 // Include checkpoint-specific modules
 #include "crc_ccitt.h"
 #include "slip.h"       // Checkpoint 3.2
-// #include "rs485_uart.h" // Checkpoint 3.3
+#include "rs485_uart.h" // Checkpoint 3.3
 // #include "nsp.h"        // Checkpoint 3.4
 
 // ============================================================================
@@ -326,13 +327,152 @@ void test_slip_codec(void) {
 }
 
 // ============================================================================
-// Checkpoint 3.3: RS-485 UART Loopback (future)
+// Checkpoint 3.3: RS-485 UART Loopback
 // ============================================================================
 
+/**
+ * @brief Test RS-485 UART with software loopback
+ *
+ * Since we don't have actual hardware loopback (TX wired to RX), this test
+ * validates the UART initialization, baud rate configuration, and basic API.
+ *
+ * For full loopback testing, physically connect:
+ * - GPIO 4 (TX) to GPIO 5 (RX)
+ * - Or use a MAX485 transceiver in loopback mode
+ */
 void test_rs485_loopback(void) {
     TEST_SECTION("Checkpoint 3.3: RS-485 UART Loopback");
-    // Implementation in future checkpoint
-    printf("Not yet implemented.\n");
+
+    bool all_passed = true;
+
+    // Test 1: Initialization
+    printf("\nTest 1: RS-485 UART Initialization\n");
+    bool init_ok = rs485_init();
+    printf("  Initialization: %s\n", init_ok ? "OK" : "FAILED");
+    printf("  Expected baud rate: 460800\n");
+    printf("  Format: 8-N-1\n");
+    TEST_RESULT("Test 1 (init)", init_ok);
+    all_passed &= init_ok;
+
+    if (!init_ok) {
+        printf("\n✗✗✗ INITIALIZATION FAILED - ABORTING TESTS ✗✗✗\n");
+        return;
+    }
+
+    // Test 2: Clear buffers
+    printf("\nTest 2: Buffer Management\n");
+    rs485_clear_rx();
+    size_t available_after_clear = rs485_available();
+    printf("  RX bytes after clear: %zu\n", available_after_clear);
+    bool test2_pass = (available_after_clear == 0);
+    TEST_RESULT("Test 2 (clear)", test2_pass);
+    all_passed &= test2_pass;
+
+    // Test 3: Send data (no loopback, just verifies API doesn't crash)
+    printf("\nTest 3: Transmit API\n");
+    uint8_t test_data[] = {0x01, 0x02, 0x03, 0x04, 0x05};
+    bool send_ok = rs485_send(test_data, sizeof(test_data));
+    printf("  Sent %zu bytes: ", sizeof(test_data));
+    for (size_t i = 0; i < sizeof(test_data); i++) {
+        printf("0x%02X ", test_data[i]);
+    }
+    printf("\n");
+    printf("  Send result: %s\n", send_ok ? "OK" : "FAILED");
+    TEST_RESULT("Test 3 (send)", send_ok);
+    all_passed &= send_ok;
+
+    // Test 4: Error handling
+    printf("\nTest 4: Error Handling\n");
+    bool test4a = !rs485_send(NULL, 10);  // Should fail with NULL data
+    bool test4b = !rs485_send(test_data, 0);  // Should fail with zero length
+    printf("  NULL data rejected: %s\n", test4a ? "OK" : "FAILED");
+    printf("  Zero length rejected: %s\n", test4b ? "OK" : "FAILED");
+    bool test4_pass = test4a && test4b;
+    TEST_RESULT("Test 4 (error handling)", test4_pass);
+    all_passed &= test4_pass;
+
+    // Test 5: Hardware loopback (only if physically wired)
+    printf("\nTest 5: Hardware Loopback (if wired)\n");
+    printf("  To enable this test, connect GPIO 4 (TX) to GPIO 5 (RX)\n");
+    printf("  Or connect through a MAX485 transceiver in loopback\n");
+
+    // Clear RX buffer
+    rs485_clear_rx();
+
+    // Send test pattern
+    uint8_t loopback_pattern[] = {0xAA, 0x55, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC};
+    rs485_send(loopback_pattern, sizeof(loopback_pattern));
+
+    // Wait a bit for data to arrive (if looped back)
+    sleep_ms(10);
+
+    // Try to read back
+    uint8_t rx_buffer[16];
+    size_t rx_count = rs485_read(rx_buffer, sizeof(rx_buffer));
+
+    printf("  Sent %zu bytes, received %zu bytes\n",
+           sizeof(loopback_pattern), rx_count);
+
+    bool loopback_ok = false;
+    if (rx_count > 0) {
+        printf("  Received: ");
+        for (size_t i = 0; i < rx_count; i++) {
+            printf("0x%02X ", rx_buffer[i]);
+        }
+        printf("\n");
+
+        // Verify data matches
+        loopback_ok = (rx_count == sizeof(loopback_pattern)) &&
+                      (memcmp(rx_buffer, loopback_pattern, rx_count) == 0);
+        printf("  Loopback verification: %s\n", loopback_ok ? "OK" : "MISMATCH");
+        TEST_RESULT("Test 5 (hardware loopback)", loopback_ok);
+        all_passed &= loopback_ok;
+    } else {
+        printf("  No data received (hardware not looped back)\n");
+        printf("  Note: GPIO 4 (TX) should be wired to GPIO 5 (RX) for this test\n");
+        TEST_RESULT("Test 5 (hardware loopback)", false);
+        // Don't fail overall test if hardware isn't connected
+        printf("  (Skipped - not counting toward pass/fail)\n");
+    }
+
+    // Test 6: Timing verification
+    printf("\nTest 6: Timing and Baud Rate\n");
+    printf("  Baud rate: 460800 bps\n");
+    printf("  Bit time: ~2.17 µs\n");
+    printf("  Byte time (10 bits): ~21.7 µs\n");
+    printf("  100-byte transmission: ~2.17 ms\n");
+
+    // Send 100 bytes and time it
+    uint8_t timing_data[100];
+    for (int i = 0; i < 100; i++) {
+        timing_data[i] = i;
+    }
+
+    absolute_time_t start = get_absolute_time();
+    rs485_send(timing_data, sizeof(timing_data));
+    absolute_time_t end = get_absolute_time();
+
+    int64_t elapsed_us = absolute_time_diff_us(start, end);
+    float elapsed_ms = elapsed_us / 1000.0f;
+
+    printf("  100 bytes transmitted in: %.3f ms (%lld µs)\n",
+           elapsed_ms, elapsed_us);
+    printf("  Expected time: ~2.17 ms\n");
+
+    // Allow some tolerance for timing (1-5 ms is reasonable with delays)
+    bool timing_ok = (elapsed_us > 1000) && (elapsed_us < 5000);
+    TEST_RESULT("Test 6 (timing)", timing_ok);
+    all_passed &= timing_ok;
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL RS-485 CORE TESTS PASSED ✓✓✓\n");
+        printf("Note: Hardware loopback test requires physical wiring\n");
+    } else {
+        printf("✗✗✗ SOME RS-485 TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
 }
 
 // ============================================================================

@@ -9,6 +9,7 @@ add_executable(nrwa_t6_emulator
     # Drivers (Phase 3)
     drivers/crc_ccitt.c
     drivers/slip.c
+    drivers/rs485_uart.c
     # Test mode
     test_mode.c
 )
