@@ -38,6 +38,29 @@ fi
 
 echo -e "${GREEN}=== Building NRWA-T6 Emulator ===${NC}"
 
+# Check for required tools
+if ! command -v picotool &> /dev/null; then
+    echo -e "${RED}ERROR: picotool not found${NC}"
+    echo ""
+    echo "Please install picotool:"
+    echo "  Option 1 - Build from source:"
+    echo "    cd ~"
+    echo "    git clone https://github.com/raspberrypi/picotool.git"
+    echo "    cd picotool"
+    echo "    mkdir build && cd build"
+    echo "    cmake .."
+    echo "    make -j\$(nproc)"
+    echo "    sudo make install"
+    echo ""
+    echo "  Option 2 - Install from package manager (if available):"
+    echo "    sudo apt install picotool"
+    echo ""
+    exit 1
+fi
+
+PICOTOOL_VERSION=$(picotool version 2>&1 | head -1 || echo "unknown")
+echo "Using picotool: $PICOTOOL_VERSION"
+
 # Handle clean build
 if [ "$CLEAN_BUILD" = true ]; then
     if [ -d "build" ]; then
@@ -74,59 +97,34 @@ if [ ! -f "Makefile" ]; then
     cmake ..
 fi
 
-# Build (this may trigger CMake reconfiguration)
-echo "Building firmware..."
-set +e  # Temporarily allow errors
-make -j$(nproc) > build.log 2>&1
-BUILD_RESULT=$?
-set -e  # Re-enable exit on error
-
-# Check if build failed
-if [ $BUILD_RESULT -ne 0 ]; then
-    # Show the error
-    cat build.log
-
-    # Check if it's the QEMU crash
-    if grep -q "qemu.*Segmentation fault" build.log; then
-        echo ""
-        echo -e "${YELLOW}QEMU crash detected - applying Makefile patch and retrying...${NC}"
-
-        # Patch the Makefile to skip ARM binary execution
-        if grep -q "^\s*cd.*&&.*\./nrwa_t6_emulator.elf" firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make 2>/dev/null; then
-            sed -i 's|^\(\s*cd.*/firmware && \)\./nrwa_t6_emulator.elf|\1echo "Skipping ARM execution (cross-compiling)"|' \
-                firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make
-
-            # Retry build
-            echo "Retrying build..."
-            make -j$(nproc)
-            rm -f build.log
-        else
-            echo -e "${RED}ERROR: Could not find ARM execution command to patch${NC}"
-            rm -f build.log
-            exit 1
-        fi
-    else
-        # Different error - exit
-        echo -e "${RED}Build failed${NC}"
-        rm -f build.log
-        exit 1
+# Patch Makefile to prevent ARM execution (QEMU crash workaround)
+# The Pico SDK build system tries to execute the ARM binary during build
+if [ -f "firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make" ]; then
+    if grep -q "^\s*cd.*/firmware && \./nrwa_t6_emulator.elf" firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make 2>/dev/null; then
+        echo "Patching Makefile to skip ARM binary execution..."
+        sed -i 's|^\(\s*cd.*/firmware && \)\./nrwa_t6_emulator.elf|\1echo "Skipping ARM execution (cross-compile)"|' \
+            firmware/CMakeFiles/nrwa_t6_emulator.dir/build.make
     fi
-else
-    # Build succeeded - clean up
-    rm -f build.log
 fi
 
-# Verify build outputs
-echo ""
+# Build
+echo "Building firmware..."
+make -j$(nproc)
+
+# Verify ELF was created
 if [ ! -f "firmware/nrwa_t6_emulator.elf" ]; then
     echo -e "${RED}ERROR: ELF file not found${NC}"
     exit 1
 fi
 
+# Convert ELF to UF2 using system picotool
+echo "Converting ELF to UF2..."
+picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+
+# Verify UF2 was created
 if [ ! -f "firmware/nrwa_t6_emulator.uf2" ]; then
     echo -e "${RED}ERROR: UF2 file not found${NC}"
     echo "Build succeeded but UF2 conversion failed"
-    echo "ELF file is available at: build/firmware/nrwa_t6_emulator.elf"
     exit 1
 fi
 

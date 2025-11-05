@@ -41,12 +41,13 @@ First, verify what tools are already installed:
 
 ```bash
 # Check for required tools
-which cmake git arm-none-eabi-gcc
+which cmake git arm-none-eabi-gcc picotool
 
 # Check versions
 cmake --version      # Need ≥ 3.13
 git --version
 arm-none-eabi-gcc --version  # If installed
+picotool version             # If installed
 ```
 
 ### Install Build Tools
@@ -70,6 +71,50 @@ arm-none-eabi-gcc --version
 **Expected output** (version may vary):
 ```
 arm-none-eabi-gcc (GNU Arm Embedded Toolchain 10.3-2021.10) 10.3.1 20210824
+```
+
+### Install picotool (REQUIRED)
+
+The `picotool` utility is required to convert ELF binaries to UF2 format for flashing to Pico.
+
+**Option 1: Build from source (recommended)**
+
+```bash
+# Install dependencies
+sudo apt install -y build-essential pkg-config libusb-1.0-0-dev cmake
+
+# Clone picotool repository
+cd ~
+git clone https://github.com/raspberrypi/picotool.git
+cd picotool
+
+# Build
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+
+# Install system-wide
+sudo make install
+
+# Verify installation
+picotool version
+```
+
+**Option 2: Install from package manager (if available)**
+
+Some distributions have picotool packages:
+
+```bash
+# Ubuntu 22.04+ or Debian
+sudo apt install picotool
+
+# Verify installation
+picotool version
+```
+
+**Expected output**:
+```
+picotool v1.1.2 (...)
 ```
 
 ---
@@ -145,7 +190,9 @@ The script will:
 **Expected output**:
 ```
 === Building NRWA-T6 Emulator ===
+Using picotool: picotool v1.1.2 (...)
 Using Pico SDK: /home/username/pico-sdk
+Patching Makefile to skip ARM binary execution...
 Building firmware...
 [100%] Built target nrwa_t6_emulator
 Converting ELF to UF2...
@@ -173,14 +220,11 @@ cmake ..
 # Build
 make -j$(nproc)
 
-# Convert ELF to UF2 (required step)
-_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+# Convert ELF to UF2 using system picotool
+picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
-**Important Notes:**
-- The standard `pico_add_extra_outputs()` is disabled due to a QEMU crash issue
-- You must manually convert ELF→UF2 using picotool (or use build.sh)
-- The build script automatically handles this for you
+**Note:** The build script (`./build.sh`) automatically patches the Makefile to avoid QEMU crashes during cross-compilation. If building manually and you encounter QEMU segfaults, the build script handles this for you.
 
 ### After Code Changes
 
@@ -193,7 +237,7 @@ When you modify source files, rebuild with:
 # OR manually
 cd build
 make -j$(nproc)
-_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
 ### Clean Rebuild
@@ -201,16 +245,15 @@ _deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_
 If you encounter issues or want a fresh build:
 
 ```bash
-# Remove build directory and rebuild
-rm -rf build
-./build.sh
+# Using build script with --clean option (recommended)
+./build.sh --clean
 
 # OR manually
 rm -rf build
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
-_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
 ### Build Output Files
@@ -642,6 +685,14 @@ screen /dev/ttyACM0 115200
 sudo apt update
 sudo apt install -y cmake git gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
 
+# Install picotool
+cd ~
+git clone https://github.com/raspberrypi/picotool.git
+cd picotool
+mkdir build && cd build
+cmake .. && make -j$(nproc)
+sudo make install
+
 # Clone Pico SDK
 cd ~
 git clone https://github.com/raspberrypi/pico-sdk.git
@@ -684,16 +735,15 @@ cd /home/rwhite/src/nsrw_emu
 # Alternative: Manual rebuild
 cd /home/rwhite/src/nsrw_emu/build
 make -j$(nproc)
-_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
 ### Clean Build (if needed)
 
 ```bash
-# Recommended: Use build script
+# Recommended: Use build script with --clean
 cd /home/rwhite/src/nsrw_emu
-rm -rf build
-./build.sh
+./build.sh --clean
 
 # Alternative: Manual clean build
 cd /home/rwhite/src/nsrw_emu
@@ -701,7 +751,7 @@ rm -rf build
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
-_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
 ---
