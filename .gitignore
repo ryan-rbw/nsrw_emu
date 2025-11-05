@@ -1,0 +1,58 @@
+# Build artifacts
+build/
+cmake-build-*/
+*.uf2
+*.bin
+*.hex
+*.elf
+*.map
+*.lst
+*.dis
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+!pico_sdk_import.cmake
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+
+# Test outputs
+tests/output/
+*.log
+
+# Generated files
+*.o
+*.a
+*.d
+
+# Flash dumps
+*.flash
+
+# Pico SDK (if fetched locally)
+pico-sdk/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
