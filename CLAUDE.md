@@ -105,6 +105,51 @@ Utilities (firmware/util/)
 
 ## Development Workflow
 
+### Checkpoint-Based Development (CRITICAL)
+
+**Every phase is broken into testable checkpoints** that can be validated on hardware incrementally.
+
+**Checkpoint Requirements**:
+1. **Builds to .uf2**: Produces flashable binary
+2. **Validates on hardware**: USB console shows test results or LED feedback
+3. **Commits separately**: Each checkpoint is a safe rollback point
+4. **Updates PROGRESS.md**: Track sub-phase progress (0% → 25% → 50% → etc.)
+
+**Test Mode Infrastructure**: `firmware/test_mode.c` + `test_mode.h`
+- Controlled via `#define CHECKPOINT_X_Y` in `app_main.c`
+- Each checkpoint has test function (e.g., `test_crc_vectors()`)
+- Tests print to USB console for visual verification
+- Can halt with `while(1)` or return to main loop
+
+**Example Checkpoint Flow**:
+```c
+// app_main.c
+#define CHECKPOINT_3_1  // Enable CRC test mode
+
+#include "test_mode.h"
+
+int main(void) {
+    stdio_init_all();
+    sleep_ms(2000);
+
+    #ifdef CHECKPOINT_3_1
+    test_crc_vectors();  // Run CRC tests
+    while(1) { sleep_ms(1000); }  // Stop here
+    #endif
+
+    // Normal main loop...
+}
+```
+
+**Flash, Test, Commit**:
+1. Enable checkpoint define in `app_main.c`
+2. Build: `make -j$(nproc)`
+3. Flash `.uf2` to Pico
+4. Connect console: `screen /dev/ttyACM0 115200`
+5. Verify test output (e.g., "All CRC tests PASSED")
+6. Commit: "Checkpoint 3.1: CRC-CCITT implementation and validation"
+7. Disable checkpoint, enable next one
+
 ### Phased Implementation (See IMP.md and PROGRESS.md)
 
 The project follows a 10-phase plan with strict acceptance criteria. **Always check PROGRESS.md** for current status.
@@ -114,7 +159,7 @@ The project follows a 10-phase plan with strict acceptance criteria. **Always ch
 - ✅ Phase 2: Platform Layer (GPIO, timebase, board config)
 
 **In Progress/Next**:
-- 🔄 Phase 3: Core Drivers (CRC, SLIP, RS-485, NSP)
+- 🔄 Phase 3: Core Drivers (4 checkpoints: CRC, SLIP, RS-485, NSP)
 
 **Important**: Each phase has acceptance criteria in IMP.md. Update PROGRESS.md when completing a phase with:
 - Files created/modified
@@ -405,7 +450,20 @@ Before committing a phase completion, verify PROGRESS.md has:
 
 ## Git Workflow
 
-**Commit messages**: Follow existing pattern:
+**Checkpoint Commit Pattern**:
+```
+Checkpoint N.M: <Component> implementation and validation
+
+- Implemented <files>
+- Test mode: <test_function_name>
+- Hardware validation: <what was tested>
+- Console output: <test results summary>
+
+Checkpoint acceptance: ✅ <criteria met>
+Phase N progress: X% (M/K checkpoints)
+```
+
+**Phase Completion Commit Pattern**:
 ```
 Phase N complete: <Title>
 
