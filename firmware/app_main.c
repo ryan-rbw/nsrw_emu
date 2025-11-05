@@ -24,10 +24,11 @@
 // Checkpoint control (uncomment to enable specific checkpoint tests)
 //#define CHECKPOINT_3_1  // CRC-CCITT test vectors
 //#define CHECKPOINT_3_2  // SLIP codec
-#define CHECKPOINT_3_3  // RS-485 UART loopback
+//#define CHECKPOINT_3_3  // RS-485 UART loopback
+#define CHECKPOINT_3_4  // NSP Protocol PING responder
 
 // Test mode
-#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3)
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4)
 #include "test_mode.h"
 #endif
 
@@ -181,6 +182,38 @@ int main(void) {
 
     // Run RS-485 loopback tests
     test_rs485_loopback();
+
+    printf("\n");
+    printf("Test complete. Halting in checkpoint mode.\n");
+    printf("Heartbeat LED will continue blinking.\n");
+    printf("\n");
+
+    // Halt here - just blink LED to show we're alive
+    while (1) {
+        static uint32_t blink_counter = 0;
+        if (blink_counter++ >= 500) {
+            blink_counter = 0;
+            static bool led = false;
+            led = !led;
+            gpio_set_heartbeat_led(led);
+        }
+        sleep_ms(1);
+    }
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // CHECKPOINT 3.4: NSP Protocol PING Responder Test Mode
+    // ========================================================================
+    #ifdef CHECKPOINT_3_4
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 3.4: NSP PROTOCOL PING RESPONDER TEST MODE   ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+
+    // Run NSP PING tests
+    test_nsp_ping();
 
     printf("\n");
     printf("Test complete. Halting in checkpoint mode.\n");

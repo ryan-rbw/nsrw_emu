@@ -12,7 +12,7 @@
 #include "crc_ccitt.h"
 #include "slip.h"       // Checkpoint 3.2
 #include "rs485_uart.h" // Checkpoint 3.3
-// #include "nsp.h"        // Checkpoint 3.4
+#include "nsp.h"        // Checkpoint 3.4
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
@@ -476,11 +476,198 @@ void test_rs485_loopback(void) {
 }
 
 // ============================================================================
-// Checkpoint 3.4: NSP Protocol (future)
+// Checkpoint 3.4: NSP Protocol - PING Responder
 // ============================================================================
 
 void test_nsp_ping(void) {
-    TEST_SECTION("Checkpoint 3.4: NSP Protocol");
-    // Implementation in future checkpoint
-    printf("Not yet implemented.\n");
+    TEST_SECTION("Checkpoint 3.4: NSP PING Responder");
+
+    // Initialize NSP with device address 1 (for testing)
+    uint8_t device_addr = 1;
+    nsp_init(device_addr);
+    printf("  Device address: %d\n\n", device_addr);
+
+    bool all_passed = true;
+
+    // Test 1: Build a PING request packet
+    printf("Test 1: Build PING Request\n");
+
+    nsp_packet_t ping_request;
+    ping_request.dest = device_addr;  // To us
+    ping_request.src = 0;             // From ground station (address 0)
+    ping_request.ctrl = nsp_make_ctrl(true, false, false, NSP_CMD_PING);  // Poll=1, B=0, A=0, CMD=PING
+    ping_request.len = 0;             // No data in PING
+
+    // Build raw packet
+    uint8_t ping_raw[NSP_MAX_PACKET_SIZE];
+    size_t ping_raw_len = 0;
+
+    // Manually build packet for testing
+    ping_raw[0] = ping_request.dest;
+    ping_raw[1] = ping_request.src;
+    ping_raw[2] = ping_request.ctrl;
+    ping_raw[3] = ping_request.len;
+
+    // Compute and append CRC
+    uint16_t crc = crc_ccitt_calculate(ping_raw, 4);
+    ping_raw[4] = (uint8_t)(crc & 0xFF);
+    ping_raw[5] = (uint8_t)((crc >> 8) & 0xFF);
+    ping_raw_len = 6;
+
+    printf("  PING packet (hex): ");
+    for (size_t i = 0; i < ping_raw_len; i++) {
+        printf("%02X ", ping_raw[i]);
+    }
+    printf("\n");
+    printf("  Dest=%d, Src=%d, Ctrl=0x%02X, Len=%d, CRC=0x%04X\n",
+           ping_request.dest, ping_request.src, ping_request.ctrl,
+           ping_request.len, crc);
+    TEST_RESULT("Test 1 (build PING)", true);
+
+    // Test 2: Parse PING packet
+    printf("\nTest 2: Parse PING Packet\n");
+
+    nsp_packet_t parsed_ping;
+    nsp_result_t parse_result = nsp_parse(ping_raw, ping_raw_len, &parsed_ping);
+
+    printf("  Parse result: ");
+    switch (parse_result) {
+        case NSP_OK:           printf("OK\n"); break;
+        case NSP_ERR_TOO_SHORT:  printf("ERR_TOO_SHORT\n"); break;
+        case NSP_ERR_BAD_LENGTH: printf("ERR_BAD_LENGTH\n"); break;
+        case NSP_ERR_BAD_CRC:    printf("ERR_BAD_CRC\n"); break;
+        default:               printf("UNKNOWN\n"); break;
+    }
+
+    bool test2_pass = (parse_result == NSP_OK) &&
+                     (parsed_ping.dest == ping_request.dest) &&
+                     (parsed_ping.src == ping_request.src) &&
+                     (parsed_ping.ctrl == ping_request.ctrl) &&
+                     (parsed_ping.len == ping_request.len);
+
+    if (test2_pass) {
+        printf("  Parsed: Dest=%d, Src=%d, Ctrl=0x%02X, Len=%d\n",
+               parsed_ping.dest, parsed_ping.src, parsed_ping.ctrl, parsed_ping.len);
+        printf("  Command code: 0x%02X (PING)\n", nsp_get_command(parsed_ping.ctrl));
+        printf("  Poll bit: %d\n", nsp_is_poll_set(parsed_ping.ctrl) ? 1 : 0);
+    }
+
+    TEST_RESULT("Test 2 (parse PING)", test2_pass);
+    all_passed &= test2_pass;
+
+    // Test 3: Generate ACK reply
+    printf("\nTest 3: Generate ACK Reply\n");
+
+    uint8_t ack_raw[NSP_MAX_PACKET_SIZE];
+    size_t ack_raw_len = 0;
+
+    bool build_ok = nsp_build_ack(&parsed_ping, ack_raw, &ack_raw_len);
+
+    if (build_ok) {
+        printf("  ACK packet (hex): ");
+        for (size_t i = 0; i < ack_raw_len; i++) {
+            printf("%02X ", ack_raw[i]);
+        }
+        printf("\n");
+        printf("  ACK length: %zu bytes\n", ack_raw_len);
+
+        // Parse the ACK to verify it's correct
+        nsp_packet_t parsed_ack;
+        nsp_result_t ack_parse = nsp_parse(ack_raw, ack_raw_len, &parsed_ack);
+
+        if (ack_parse == NSP_OK) {
+            printf("  ACK parsed: Dest=%d, Src=%d, Ctrl=0x%02X, Len=%d\n",
+                   parsed_ack.dest, parsed_ack.src, parsed_ack.ctrl, parsed_ack.len);
+
+            // Verify ACK properties:
+            // - Dest = original Src
+            // - Src = our address
+            // - Ctrl: B/A bits preserved, Poll cleared, same command
+            bool test3_pass = (parsed_ack.dest == parsed_ping.src) &&
+                             (parsed_ack.src == device_addr) &&
+                             (parsed_ack.len == 0) &&
+                             (nsp_get_command(parsed_ack.ctrl) == NSP_CMD_PING) &&
+                             (ack_parse == NSP_OK);
+
+            TEST_RESULT("Test 3 (generate ACK)", test3_pass);
+            all_passed &= test3_pass;
+        } else {
+            printf("  ACK parse failed!\n");
+            TEST_RESULT("Test 3 (generate ACK)", false);
+            all_passed = false;
+        }
+    } else {
+        printf("  Failed to build ACK\n");
+        TEST_RESULT("Test 3 (generate ACK)", false);
+        all_passed = false;
+    }
+
+    // Test 4: Full PING/ACK round-trip
+    printf("\nTest 4: Full PING/ACK Round-Trip\n");
+
+    // Simulate receiving PING and generating ACK
+    nsp_packet_t rx_ping;
+    nsp_result_t rx_result = nsp_parse(ping_raw, ping_raw_len, &rx_ping);
+
+    if (rx_result == NSP_OK && nsp_get_command(rx_ping.ctrl) == NSP_CMD_PING) {
+        printf("  ✓ PING received and recognized\n");
+
+        // Generate ACK
+        uint8_t tx_ack[NSP_MAX_PACKET_SIZE];
+        size_t tx_ack_len = 0;
+
+        if (nsp_build_ack(&rx_ping, tx_ack, &tx_ack_len)) {
+            printf("  ✓ ACK generated (%zu bytes)\n", tx_ack_len);
+
+            // Verify ACK is valid
+            nsp_packet_t verify_ack;
+            if (nsp_parse(tx_ack, tx_ack_len, &verify_ack) == NSP_OK) {
+                printf("  ✓ ACK is valid and CRC correct\n");
+                TEST_RESULT("Test 4 (round-trip)", true);
+                all_passed &= true;
+            } else {
+                printf("  ✗ ACK CRC verification failed\n");
+                TEST_RESULT("Test 4 (round-trip)", false);
+                all_passed = false;
+            }
+        } else {
+            printf("  ✗ ACK generation failed\n");
+            TEST_RESULT("Test 4 (round-trip)", false);
+            all_passed = false;
+        }
+    } else {
+        printf("  ✗ PING receive/parse failed\n");
+        TEST_RESULT("Test 4 (round-trip)", false);
+        all_passed = false;
+    }
+
+    // Test 5: CRC Validation (intentional corruption)
+    printf("\nTest 5: CRC Validation (Bad CRC)\n");
+
+    uint8_t bad_packet[NSP_MAX_PACKET_SIZE];
+    memcpy(bad_packet, ping_raw, ping_raw_len);
+
+    // Corrupt the CRC
+    bad_packet[4] ^= 0xFF;
+
+    nsp_packet_t bad_parse;
+    nsp_result_t bad_result = nsp_parse(bad_packet, ping_raw_len, &bad_parse);
+
+    bool test5_pass = (bad_result == NSP_ERR_BAD_CRC);
+    printf("  Expected: NSP_ERR_BAD_CRC, Got: %d\n", bad_result);
+    TEST_RESULT("Test 5 (CRC validation)", test5_pass);
+    all_passed &= test5_pass;
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL NSP PING TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME NSP TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
 }
+
+// ============================================================================
+// Future Checkpoints
+// ============================================================================
