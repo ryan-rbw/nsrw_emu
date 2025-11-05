@@ -445,24 +445,51 @@ Each phase below lists its checkpoints with acceptance criteria.
 
 **Goal**: Wheel dynamics simulation running on Core1
 
-**Checkpoints**: 3 (Register map 33%, Physics model 66%, Core1 integration 100%)
+**Checkpoints**: 3 (33% each)
 
-**Tasks**:
+---
 
-#### 5.1 Register Map (`nss_nrwa_t6_regs.h`)
-- Define all PEEK/POKE addresses
-- Structures for control/status/config registers
+#### Checkpoint 5.1: Register Map (33%)
+
+**Implement**: `device/nss_nrwa_t6_regs.h`
+
+**Details**:
+- Define all PEEK/POKE addresses per ICD
+- Control registers: mode, setpoint, direction
+- Status registers: speed, current, torque, power
+- Config registers: protection thresholds
 - Example:
   ```c
   #define REG_OVERVOLTAGE_THRESHOLD  0x0100  // UQ16.16
   #define REG_OVERSPEED_FAULT_RPM    0x0104  // UQ14.18
   #define REG_MOTOR_OVERPOWER_LIMIT  0x0108  // UQ18.14 mW
+  #define REG_CONTROL_MODE           0x0200  // enum
+  #define REG_SPEED_SETPOINT_RPM     0x0204  // UQ14.18
   ```
 
-#### 5.2 Physics Model (`nss_nrwa_t6_model.c`)
+**Test Mode**: `test_register_map()` in `test_mode.c`
+- Test 1: Verify all register addresses are non-overlapping
+- Test 2: Read default values from register table
+- Test 3: Validate UQ format assignments match spec
+- Test 4: Test register grouping (control/status/config)
+
+**Hardware Validation**:
+1. Flash to Pico
+2. Console shows register map table
+3. Display all registers with addresses, types, and defaults
+
+**Acceptance**: ✅ Register map complete with all ICD addresses defined
+
+---
+
+#### Checkpoint 5.2: Physics Model & Control Modes (66%)
+
+**Implement**: `device/nss_nrwa_t6_model.c` + `nss_nrwa_t6_model.h`
+
+**Details**:
 - State variables:
   ```c
-  struct wheel_state {
+  typedef struct {
       float omega_rad_s;      // Angular velocity
       float momentum_nms;     // H = I·ω
       float current_cmd_a;    // Commanded current
@@ -470,8 +497,8 @@ Each phase below lists its checkpoints with acceptance criteria.
       float torque_cmd_mnm;   // Commanded torque
       float torque_out_mnm;   // Output torque
       float power_w;          // Electrical power
-      uint32_t mode;          // CURRENT|SPEED|TORQUE|PWM
-  };
+      control_mode_t mode;    // CURRENT|SPEED|TORQUE|PWM
+  } wheel_state_t;
   ```
 - Dynamics (Δt = 10 ms):
   - τ_motor = k_t · i (k_t ≈ 0.0534 N·m/A)
@@ -480,30 +507,77 @@ Each phase below lists its checkpoints with acceptance criteria.
   - ω_new = ω_old + α·Δt
 - Control modes:
   - **Current**: Direct i_cmd → τ
-  - **Speed**: PI controller with anti-windup
-  - **Torque**: ΔH feed-forward
-  - **PWM**: Backup duty-cycle mode
+  - **Speed**: PI controller with anti-windup (Kp, Ki, I_max)
+  - **Torque**: ΔH feed-forward with current limiting
+  - **PWM**: Backup duty-cycle mode (0-97.85%)
 - Limits:
-  - Power: |τ·ω| ≤ P_lim (100 W)
+  - Power: |τ·ω| ≤ 100 W
   - Duty: ≤ 97.85%
   - Current: ≤ 6 A
 
-#### 5.3 Core1 Tick
-- Alarm callback at 100 Hz
-- Update physics
-- Check protections
-- Publish state to ring buffer (→ Core0)
-- Measure jitter with `time_us_64()`
+**Test Mode**: `test_wheel_physics()` in `test_mode.c`
+- Test 1: Initialize model, verify zero state
+- Test 2: Current mode: Command 1A, verify torque = k_t * 1A
+- Test 3: Speed mode: Command 1000 RPM, verify ramp-up
+- Test 4: Torque mode: Command 10 mN·m, verify current response
+- Test 5: Power limiting: Command exceeds 100W, verify clamp
+- Test 6: Loss model: Spin at 3000 RPM, verify deceleration
 
-**Deliverables**:
+**Hardware Validation**:
+1. Flash to Pico
+2. Console shows physics tick at 10 Hz (visible for testing)
+3. Display state variables updating in real-time
+4. Speed ramp test: 0 → 3000 RPM in ~5 seconds
+
+**Acceptance**: ✅ Physics model runs, all control modes functional, limits enforced
+
+---
+
+#### Checkpoint 5.3: Core1 Integration & 100 Hz Tick (100%)
+
+**Implement**: Core1 entry point in `app_main.c`, integrate timebase
+
+**Details**:
+- Launch Core1 with `multicore_launch_core1(core1_main)`
+- Core1 main loop:
+  - Setup 100 Hz alarm using `timebase_init()` with callback
+  - In callback:
+    - Call `wheel_model_tick()`
+    - Check protections
+    - Publish state snapshot to ring buffer
+    - Measure jitter: `time_us_64()` deltas
+- Inter-core communication:
+  - Core0 → Core1: Command mailbox (spinlock-protected)
+  - Core1 → Core0: Telemetry ring buffer (lock-free SPSC)
+
+**Test Mode**: `test_core1_timing()` in `test_mode.c`
+- Test 1: Launch Core1, verify it starts
+- Test 2: Measure tick rate over 1000 ticks
+- Test 3: Jitter analysis: min/max/avg/p99 tick timing
+- Test 4: Inter-core comm: Core0 sends command, Core1 acknowledges
+- Test 5: Ring buffer: Core1 publishes 100 samples, Core0 reads all
+
+**Hardware Validation**:
+1. Flash to Pico
+2. Console shows Core1 launch message
+3. Display tick rate (should show ~100.0 Hz)
+4. Display jitter stats (p99 < 200 µs)
+5. Toggle GPIO on each tick, verify with scope/logic analyzer
+
+**Acceptance**: ✅ Core1 running at 100 Hz, jitter < 200 µs, inter-core comm working
+
+---
+
+**Phase 5 Final Deliverables**:
 - `device/nss_nrwa_t6_regs.h`
-- `device/nss_nrwa_t6_model.c`
-- Core1 loop in `app_main.c`
+- `device/nss_nrwa_t6_model.c/h`
+- Core1 integration in `app_main.c`
 
-**Acceptance**:
-- Spin-up to 3000 RPM in speed mode
-- Jitter < 200 µs (99th percentile)
-- Power limit enforced correctly
+**Phase 5 Final Acceptance**:
+- Register map complete
+- Physics model validated for all 4 control modes
+- Core1 running at 100 Hz with acceptable jitter
+- Inter-core communication operational
 
 ---
 
