@@ -204,21 +204,56 @@ Updated [firmware/app_main.c](firmware/app_main.c):
 
 ---
 
-## Phase 3: Core Communication Drivers ⏸️ PENDING
+## Phase 3: Core Communication Drivers 🔄 IN PROGRESS
 
-**Status**: Not started
-**Target Files**:
-- `firmware/drivers/crc_ccitt.c` - CRC-16 CCITT
-- `firmware/drivers/slip.c` - SLIP encoder/decoder
-- `firmware/drivers/rs485_uart.c` - RS-485 UART driver
-- `firmware/drivers/nsp.c` - NSP protocol handler
-- `firmware/drivers/leds.c` - Status LEDs
+**Status**: Checkpoints 0/4 complete (0%)
+**Started**: TBD
 
-**Acceptance Criteria** (from [IMP.md:209-216](IMP.md#L209-L216)):
-- [ ] PING command (0x00) → ACK reply validated
-- [ ] CRC matches test vectors
-- [ ] SLIP handles escaped bytes correctly
-- [ ] RS-485 tri-state control working
+### Checkpoint Strategy
+
+This phase uses **4 checkpoints** (25% each) with hardware validation at each step:
+
+| Checkpoint | Component | Status | Acceptance |
+|------------|-----------|--------|------------|
+| 3.1 | CRC-CCITT | ⏸️ Pending | CRC matches test vectors |
+| 3.2 | SLIP Codec | ⏸️ Pending | Round-trip preserves data |
+| 3.3 | RS-485 UART | ⏸️ Pending | Loopback works, DE/RE timing correct |
+| 3.4 | NSP Protocol | ⏸️ Pending | PING generates valid ACK |
+
+### Target Files
+
+**Drivers**:
+- `firmware/drivers/crc_ccitt.c/h` - CRC-16 CCITT (LSB-first)
+- `firmware/drivers/slip.c/h` - SLIP encoder/decoder
+- `firmware/drivers/rs485_uart.c/h` - RS-485 UART driver (software loopback)
+- `firmware/drivers/nsp.c/h` - NSP protocol handler
+- `firmware/drivers/leds.c/h` - Status LEDs
+
+**Test Infrastructure**:
+- `firmware/test_mode.c/h` - Checkpoint test functions
+
+### Acceptance Criteria (from [IMP.md](IMP.md))
+
+**Checkpoint 3.1: CRC-CCITT**
+- [ ] All CRC test vectors match expected values
+- [ ] LSB-first bit order validated
+
+**Checkpoint 3.2: SLIP Codec**
+- [ ] SLIP round-trip preserves data
+- [ ] Edge cases handled (END, ESC, consecutive escapes)
+
+**Checkpoint 3.3: RS-485 UART**
+- [ ] UART loopback works at 460.8 kbps
+- [ ] DE/RE timing correct (±2µs)
+
+**Checkpoint 3.4: NSP Protocol**
+- [ ] PING command generates valid ACK with correct CRC
+- [ ] LED feedback confirms packet processing
+
+### Phase 3 Final Acceptance
+- [ ] All 4 checkpoints passing on hardware
+- [ ] End-to-end: Host sends SLIP-encoded NSP PING → Emulator replies with ACK
+- [ ] CRC validated, SLIP framing correct, UART timing within spec
 
 ---
 
