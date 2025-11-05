@@ -1,0 +1,694 @@
+# NRWA-T6 Emulator - Build and Flash Guide
+
+Complete instructions for setting up the development environment, building firmware, and flashing to Raspberry Pi Pico.
+
+---
+
+## Table of Contents
+
+1. [Hardware Requirements](#hardware-requirements)
+2. [Software Prerequisites](#software-prerequisites)
+3. [Pico SDK Installation](#pico-sdk-installation)
+4. [Building the Firmware](#building-the-firmware)
+5. [Flashing to Pico](#flashing-to-pico)
+6. [Connecting to Console](#connecting-to-console)
+7. [Expected Output](#expected-output)
+8. [Troubleshooting](#troubleshooting)
+9. [Quick Reference](#quick-reference)
+
+---
+
+## Hardware Requirements
+
+### Required
+- **Raspberry Pi Pico** (RP2040-based, standard Pico - **NOT** Pico W/W2)
+- **USB Micro-B cable** (must support data transfer, not power-only)
+- **Computer** running Linux (Ubuntu 20.04+ or similar)
+
+### Optional (for full testing)
+- Breadboard
+- Jumper wires (for address pin configuration)
+- MAX485 or compatible RS-485 transceiver (for Phase 3 Checkpoint 3.3+)
+- Logic analyzer (for protocol validation)
+
+---
+
+## Software Prerequisites
+
+### Check Current System
+
+First, verify what tools are already installed:
+
+```bash
+# Check for required tools
+which cmake git arm-none-eabi-gcc
+
+# Check versions
+cmake --version      # Need ≥ 3.13
+git --version
+arm-none-eabi-gcc --version  # If installed
+```
+
+### Install Build Tools
+
+If any tools are missing, install them:
+
+```bash
+# Update package lists
+sudo apt update
+
+# Install CMake and Git (if needed)
+sudo apt install -y cmake git
+
+# Install ARM GCC toolchain (REQUIRED)
+sudo apt install -y gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
+
+# Verify ARM toolchain installation
+arm-none-eabi-gcc --version
+```
+
+**Expected output** (version may vary):
+```
+arm-none-eabi-gcc (GNU Arm Embedded Toolchain 10.3-2021.10) 10.3.1 20210824
+```
+
+---
+
+## Pico SDK Installation
+
+### Step 1: Check if SDK Already Exists
+
+```bash
+# Check environment variable
+echo $PICO_SDK_PATH
+
+# Check common locations
+ls ~/pico-sdk 2>/dev/null && echo "Found in home directory"
+ls /usr/share/pico-sdk 2>/dev/null && echo "Found in /usr/share"
+```
+
+If SDK is already installed and `PICO_SDK_PATH` is set, skip to [Building the Firmware](#building-the-firmware).
+
+### Step 2: Clone Pico SDK
+
+```bash
+# Clone to home directory
+cd ~
+git clone https://github.com/raspberrypi/pico-sdk.git
+
+# Enter SDK directory
+cd pico-sdk
+
+# Initialize submodules (IMPORTANT - don't skip this)
+git submodule update --init
+```
+
+This will download approximately 150 MB and may take 2-5 minutes depending on your connection.
+
+### Step 3: Set Environment Variable
+
+```bash
+# Set for current session
+export PICO_SDK_PATH=~/pico-sdk
+
+# Make permanent (add to ~/.bashrc)
+echo 'export PICO_SDK_PATH=~/pico-sdk' >> ~/.bashrc
+
+# Verify
+echo $PICO_SDK_PATH
+ls $PICO_SDK_PATH/cmake  # Should show CMake files
+```
+
+---
+
+## Building the Firmware
+
+### Step 1: Navigate to Project Directory
+
+```bash
+cd /home/rwhite/src/nsrw_emu
+```
+
+Or wherever you cloned this repository.
+
+### Step 2: Create Build Directory
+
+```bash
+# Create build directory (first time only)
+mkdir -p build
+
+# Enter build directory
+cd build
+```
+
+### Step 3: Configure with CMake
+
+```bash
+# Configure the build system
+cmake ..
+```
+
+**Expected output** (key lines):
+```
+-- The C compiler identification is GNU 10.3.1
+-- The CXX compiler identification is GNU 10.3.1
+-- PICO_SDK_PATH is /home/username/pico-sdk
+-- Build type is Release
+-- Pico board: pico
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/rwhite/src/nsrw_emu/build
+```
+
+If you see errors here, see [Troubleshooting](#troubleshooting).
+
+### Step 4: Build the Firmware
+
+```bash
+# Build (use all CPU cores for speed)
+make -j$(nproc)
+```
+
+**Expected output** (last lines):
+```
+[100%] Linking CXX executable nrwa_t6_emulator.elf
+   text    data     bss     dec     hex filename
+  45678    1234    5678   52590    cd6e nrwa_t6_emulator.elf
+[100%] Built target nrwa_t6_emulator
+```
+
+### Step 5: Verify Output Files
+
+```bash
+# Check for UF2 file (this is what you flash to Pico)
+ls -lh firmware/nrwa_t6_emulator.uf2
+
+# You should also see:
+ls -lh firmware/nrwa_t6_emulator.elf  # ELF binary
+ls -lh firmware/nrwa_t6_emulator.bin  # Raw binary
+ls -lh firmware/nrwa_t6_emulator.hex  # Intel HEX format
+```
+
+**The .uf2 file** is what you'll flash to the Pico.
+
+---
+
+## Flashing to Pico
+
+### Step 1: Enter BOOTSEL Mode
+
+1. **Disconnect** the Pico from USB (if connected)
+2. **Hold down** the white **BOOTSEL button** on the Pico (near USB connector)
+3. **While holding BOOTSEL**, connect the USB cable to your computer
+4. **Release** the BOOTSEL button
+
+The Pico should now mount as a USB drive.
+
+### Step 2: Verify Pico Mounted
+
+```bash
+# Check if RPI-RP2 drive appears
+ls /media/$USER/RPI-RP2
+
+# Should show:
+# INFO_UF2.TXT  INDEX.HTM
+```
+
+**Alternative locations** (if not in /media/$USER/):
+```bash
+ls /media/RPI-RP2
+ls /run/media/$USER/RPI-RP2
+```
+
+### Step 3: Copy Firmware to Pico
+
+**Method 1: Command Line (Recommended)**
+
+```bash
+# From the build directory
+cp firmware/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
+
+# The Pico will automatically reboot after copy completes
+```
+
+**Method 2: File Manager**
+
+1. Open your file manager
+2. Navigate to `build/firmware/`
+3. Drag `nrwa_t6_emulator.uf2` to the `RPI-RP2` drive
+4. The drive will disappear automatically when flashing completes
+
+**Method 3: Using picotool (Advanced)**
+
+```bash
+# Install picotool (optional)
+sudo apt install picotool
+
+# Flash directly (Pico must be in BOOTSEL mode)
+picotool load firmware/nrwa_t6_emulator.uf2
+picotool reboot
+```
+
+### Step 4: Confirm Flashing Success
+
+After flashing:
+- The RPI-RP2 drive will **disappear** (this is normal)
+- The Pico will **reboot** and run your firmware
+- The onboard LED should start **blinking at 1 Hz**
+
+---
+
+## Connecting to Console
+
+The firmware uses USB-CDC (USB serial) for console output.
+
+### Step 1: Find Serial Port
+
+```bash
+# List USB serial devices
+ls /dev/ttyACM*
+
+# Should show: /dev/ttyACM0 (or /dev/ttyACM1 if others are connected)
+
+# Verify it's the Pico
+dmesg | tail -20
+```
+
+You should see recent kernel messages about a USB CDC device.
+
+### Step 2: Set Permissions (First Time Only)
+
+```bash
+# Add your user to dialout group (allows serial port access)
+sudo usermod -a -G dialout $USER
+
+# Log out and log back in for this to take effect
+# Or use: newgrp dialout
+```
+
+### Step 3: Connect with Terminal Program
+
+**Option A: screen (simplest)**
+
+```bash
+# Connect (115200 baud, 8N1)
+screen /dev/ttyACM0 115200
+
+# To exit screen: Press Ctrl-A, then K, then Y
+```
+
+**Option B: minicom**
+
+```bash
+# Install if needed
+sudo apt install minicom
+
+# Connect
+minicom -D /dev/ttyACM0 -b 115200
+```
+
+**Option C: Python serial terminal**
+
+```bash
+# Install if needed
+pip3 install pyserial
+
+# Connect
+python3 -m serial.tools.miniterm /dev/ttyACM0 115200
+
+# To exit: Ctrl-]
+```
+
+### Step 4: View Output
+
+If the Pico was already running when you connected, you might not see output immediately.
+
+To restart and see the full boot sequence:
+1. Unplug the Pico USB cable
+2. Start your terminal program (e.g., `screen /dev/ttyACM0 115200`)
+3. Plug the Pico back in
+4. You should see the startup banner and test output
+
+---
+
+## Expected Output
+
+### Checkpoint 3.1 (CRC-CCITT Test)
+
+When running with `CHECKPOINT_3_1` enabled (current configuration), you should see:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║     NRWA-T6 Reaction Wheel Emulator                       ║
+║     NewSpace Systems NRWA-T6 Compatible                   ║
+╚════════════════════════════════════════════════════════════╝
+
+Firmware Version : v0.1.0-8fe6124
+Build Date       : Nov  5 2025 HH:MM:SS
+Target Platform  : RP2040 (Pico)
+Board ID         : E6614103E73F2B34
+
+Status           : Initializing...
+
+[Core0] Initializing hardware...
+[Core0] Device address: 0x00 (from ADDR pins)
+
+╔════════════════════════════════════════════════════════════╗
+║  CHECKPOINT 3.1: CRC-CCITT TEST MODE                      ║
+╚════════════════════════════════════════════════════════════╝
+
+=== Checkpoint 3.1: CRC-CCITT Test Vectors ===
+
+Test 1: {0x01, 0x02, 0x03}
+  Calculated CRC: 0x7E70
+  Test 1: ✓ PASS
+
+Test 2: Empty buffer
+  Calculated CRC: 0xFFFF
+  Test 2 (empty): ✓ PASS
+
+Test 3: {0x00}
+  Calculated CRC: 0x1D0F
+  Test 3: ✓ PASS
+
+Test 4: {0xFF, 0xFF, 0xFF, 0xFF}
+  Calculated CRC: 0x1D00
+  Test 4: ✓ PASS
+
+Test 5: ASCII "123456789"
+  Calculated CRC: 0x29B1
+  Test 5 (ASCII): ✓ PASS
+
+Test 6: Incremental calculation {0x01, 0x02, 0x03}
+  Calculated CRC: 0x7E70
+  Test 6 (incremental): ✓ PASS
+
+Test 7: NSP PING packet
+  Calculated CRC: 0x543D
+  Test 7 (NSP PING): ✓ PASS
+
+✓✓✓ ALL CRC TESTS PASSED ✓✓✓
+
+Test complete. Halting in checkpoint mode.
+Heartbeat LED will continue blinking.
+```
+
+### Physical Indicators
+
+- **Onboard LED**: Blinks at 1 Hz (on for 500ms, off for 500ms)
+- **No error messages**: Clean output with all tests passing
+
+---
+
+## Troubleshooting
+
+### Build Issues
+
+#### Error: "PICO_SDK_PATH not found"
+
+**Problem**: CMake can't find the Pico SDK.
+
+**Solution 1** - Set environment variable:
+```bash
+export PICO_SDK_PATH=~/pico-sdk
+cmake ..
+```
+
+**Solution 2** - Pass directly to CMake:
+```bash
+cmake -DPICO_SDK_PATH=~/pico-sdk ..
+```
+
+**Solution 3** - Verify SDK installation:
+```bash
+ls $PICO_SDK_PATH/cmake
+# Should show: pico_sdk_init.cmake and other files
+```
+
+#### Error: "arm-none-eabi-gcc: command not found"
+
+**Problem**: ARM toolchain not installed.
+
+**Solution**:
+```bash
+sudo apt install gcc-arm-none-eabi libnewlib-arm-none-eabi
+```
+
+#### Error: "pico_sdk_import.cmake not found"
+
+**Problem**: SDK submodules not initialized.
+
+**Solution**:
+```bash
+cd ~/pico-sdk
+git submodule update --init
+```
+
+### Flashing Issues
+
+#### Problem: Pico doesn't mount as RPI-RP2
+
+**Solution 1** - Try different USB cable:
+- Some cables are power-only and don't carry data
+- Use a cable you know works for data transfer
+
+**Solution 2** - Hold BOOTSEL longer:
+- Hold the button down while plugging in
+- Keep holding for 2-3 seconds after plugging in
+
+**Solution 3** - Check USB connection:
+```bash
+# Check if Pico is detected at all
+lsusb | grep -i "Raspberry\|RP2"
+
+# Check kernel messages
+dmesg | tail -30
+```
+
+**Solution 4** - Try different USB port:
+- Use a USB 2.0 port directly on your computer
+- Avoid USB hubs if possible
+
+#### Problem: Permission denied when copying UF2
+
+**Solution**:
+```bash
+# Check mount point ownership
+ls -ld /media/$USER/RPI-RP2
+
+# If needed, remount with write permissions
+# (usually not necessary, but worth checking)
+```
+
+### Console Issues
+
+#### Problem: No /dev/ttyACM0 device appears
+
+**Solution 1** - Check if device enumerated:
+```bash
+dmesg | grep -i "cdc\|tty"
+# Look for recent messages about USB CDC ACM device
+```
+
+**Solution 2** - Check USB serial drivers loaded:
+```bash
+lsmod | grep cdc_acm
+# Should show: cdc_acm
+```
+
+**Solution 3** - Check if device has different name:
+```bash
+ls /dev/ttyACM*  # Might be ttyACM1, ttyACM2, etc.
+ls /dev/ttyUSB*  # Some systems use this
+```
+
+#### Problem: Permission denied accessing /dev/ttyACM0
+
+**Solution**:
+```bash
+# Add user to dialout group
+sudo usermod -a -G dialout $USER
+
+# Check current groups
+groups
+
+# If dialout not listed, log out and log back in
+# Or use: newgrp dialout
+```
+
+**Quick workaround** (not recommended for permanent use):
+```bash
+sudo chmod 666 /dev/ttyACM0
+screen /dev/ttyACM0 115200
+```
+
+#### Problem: Console shows garbage characters
+
+**Solution 1** - Verify baud rate:
+```bash
+# Make sure you're using 115200 baud
+screen /dev/ttyACM0 115200
+```
+
+**Solution 2** - Reset the Pico:
+- Unplug and replug USB cable
+- Or press the RUN button on the Pico (if accessible)
+
+**Solution 3** - Check USB cable quality:
+- Try a different cable
+- Try a different USB port
+
+#### Problem: No output in console (blank screen)
+
+**Solution 1** - Restart the Pico:
+```bash
+# Disconnect, then reconnect while terminal is open
+```
+
+**Solution 2** - Check if firmware is running:
+- The LED should be blinking at 1 Hz
+- If not, reflash the firmware
+
+**Solution 3** - Verify USB-CDC is enabled:
+```bash
+# Check firmware/CMakeLists.txt has:
+# pico_enable_stdio_usb(nrwa_t6_emulator 1)
+```
+
+### Runtime Issues
+
+#### Problem: CRC tests fail
+
+**Symptoms**: Console shows "✗ FAIL" for one or more tests.
+
+**This should not happen** - if tests fail, it indicates a problem:
+
+1. Check build warnings:
+   ```bash
+   cd build
+   make clean
+   make 2>&1 | tee build.log
+   # Review build.log for warnings
+   ```
+
+2. Verify source code integrity:
+   ```bash
+   git status  # Should be clean
+   git diff    # Should show no uncommitted changes
+   ```
+
+3. Rebuild from scratch:
+   ```bash
+   cd build
+   rm -rf *
+   cmake ..
+   make -j$(nproc)
+   ```
+
+#### Problem: LED not blinking
+
+**Possible causes**:
+- Firmware not running (stuck in boot or crashed)
+- LED hardware issue (rare)
+
+**Solution**:
+```bash
+# Check console for error messages
+# Try reflashing firmware
+# Check for panic/crash messages in console
+```
+
+---
+
+## Quick Reference
+
+### One-Time Setup
+
+```bash
+# Install tools
+sudo apt update
+sudo apt install -y cmake git gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
+
+# Clone Pico SDK
+cd ~
+git clone https://github.com/raspberrypi/pico-sdk.git
+cd pico-sdk
+git submodule update --init
+
+# Set environment
+export PICO_SDK_PATH=~/pico-sdk
+echo 'export PICO_SDK_PATH=~/pico-sdk' >> ~/.bashrc
+
+# Add to dialout group
+sudo usermod -a -G dialout $USER
+# Log out and back in
+```
+
+### Build and Flash Workflow
+
+```bash
+# Navigate to project
+cd /home/rwhite/src/nsrw_emu
+
+# Configure (first time only)
+mkdir -p build && cd build
+cmake ..
+
+# Build
+make -j$(nproc)
+
+# Flash (Pico in BOOTSEL mode)
+cp firmware/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
+
+# Connect console
+screen /dev/ttyACM0 115200
+# Exit screen: Ctrl-A, then K, then Y
+```
+
+### Rebuild After Code Changes
+
+```bash
+cd /home/rwhite/src/nsrw_emu/build
+make -j$(nproc)
+# Flash and test as above
+```
+
+### Clean Build (if needed)
+
+```bash
+cd /home/rwhite/src/nsrw_emu/build
+rm -rf *
+cmake ..
+make -j$(nproc)
+```
+
+---
+
+## Next Steps
+
+After successfully building and testing Checkpoint 3.1:
+
+1. **Verify all tests pass** - All 7 CRC tests should show ✓ PASS
+2. **Check LED is blinking** - Confirms hardware initialization worked
+3. **Proceed to Checkpoint 3.2** - SLIP codec implementation
+4. **See [IMP.md](IMP.md)** for implementation roadmap
+5. **See [PROGRESS.md](PROGRESS.md)** for current status
+
+---
+
+## Additional Resources
+
+- **Pico SDK Documentation**: https://www.raspberrypi.com/documentation/pico-sdk/
+- **RP2040 Datasheet**: https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf
+- **Getting Started with Pico**: https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf
+- **This Project's Documentation**:
+  - [README.md](README.md) - Project overview
+  - [SPEC.md](SPEC.md) - Full specification
+  - [IMP.md](IMP.md) - Implementation plan
+  - [PROGRESS.md](PROGRESS.md) - Current status
+
+---
+
+**Last Updated**: 2025-11-05
+**Current Checkpoint**: 3.1 (CRC-CCITT) ✅ Complete
+**Next Checkpoint**: 3.2 (SLIP Codec)
