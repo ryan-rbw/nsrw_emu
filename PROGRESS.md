@@ -118,7 +118,7 @@ Features:
 
 **Status**: Complete
 **Completed**: 2025-11-05
-**Commits**: TBD
+**Commits**: `acee592`
 
 ### What We Built
 
