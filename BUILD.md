@@ -387,7 +387,30 @@ sudo usermod -a -G dialout $USER
 
 ### Step 3: Connect with Terminal Program
 
-**Option A: screen (simplest)**
+**Option A: connect.sh Script (Recommended)**
+
+```bash
+# From project root - automatic console connection
+./connect.sh
+
+# Connect to specific port
+./connect.sh /dev/ttyACM1
+
+# Show help
+./connect.sh --help
+```
+
+The script will:
+
+- Check for minicom installation
+- Verify serial port exists
+- Check user permissions (dialout group)
+- Connect with proper settings (115200 baud, 8N1)
+- Display keyboard shortcuts
+
+**To exit minicom**: Press `Ctrl-A`, then `X`, then confirm with `Enter`
+
+**Option B: screen (simplest manual method)**
 
 ```bash
 # Connect (115200 baud, 8N1)
@@ -396,17 +419,19 @@ screen /dev/ttyACM0 115200
 # To exit screen: Press Ctrl-A, then K, then Y
 ```
 
-**Option B: minicom**
+**Option C: minicom (manual)**
 
 ```bash
 # Install if needed
 sudo apt install minicom
 
 # Connect
-minicom -D /dev/ttyACM0 -b 115200
+minicom -D /dev/ttyACM0 -b 115200 -8 -o
+
+# To exit: Ctrl-A, then X
 ```
 
-**Option C: Python serial terminal**
+**Option D: Python serial terminal**
 
 ```bash
 # Install if needed
@@ -733,7 +758,7 @@ sudo usermod -a -G dialout $USER
 
 ### Build and Flash Workflow
 
-#### Option 1: Using load.sh (Recommended for Development)
+#### Option 1: Using Automation Scripts (Recommended)
 
 ```bash
 # Navigate to project
@@ -745,12 +770,29 @@ cd /home/rwhite/src/nsrw_emu
 # Flash with picotool (Pico in BOOTSEL mode)
 ./load.sh
 
-# Connect console
+# Connect to serial console
+./connect.sh
+# Exit minicom: Ctrl-A, then X
+```
+
+#### Option 2: Using load.sh with Manual Console
+
+```bash
+# Navigate to project
+cd /home/rwhite/src/nsrw_emu
+
+# Build firmware
+./build.sh
+
+# Flash with picotool (Pico in BOOTSEL mode)
+./load.sh
+
+# Connect console manually
 screen /dev/ttyACM0 115200
 # Exit screen: Ctrl-A, then K, then Y
 ```
 
-#### Option 2: Using USB Mass Storage
+#### Option 3: Using USB Mass Storage
 
 ```bash
 # Navigate to project
@@ -763,8 +805,8 @@ cd /home/rwhite/src/nsrw_emu
 cp build/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 
 # Connect console
-screen /dev/ttyACM0 115200
-# Exit screen: Ctrl-A, then K, then Y
+./connect.sh
+# Or: screen /dev/ttyACM0 115200
 ```
 
 ### Rebuild After Code Changes
