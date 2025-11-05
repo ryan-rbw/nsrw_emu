@@ -117,6 +117,41 @@ picotool version
 picotool v1.1.2 (...)
 ```
 
+### Configure USB Permissions for Pico (REQUIRED)
+
+To use picotool and access the Pico in BOOTSEL mode without sudo, you need to configure udev rules:
+
+```bash
+# Create udev rules file for Pico USB access
+sudo tee /etc/udev/rules.d/99-pico.rules > /dev/null << 'EOF'
+# Raspberry Pi Pico
+# RP2 Boot (BOOTSEL mode)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0003", MODE="0666"
+
+# Picoprobe
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0004", MODE="0666"
+
+# MicroPython (CDC)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0005", MODE="0666"
+EOF
+
+# Reload udev rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Verify (with Pico in BOOTSEL mode)
+picotool info
+```
+
+**Without these rules**, you'll see:
+```
+No accessible RP-series devices in BOOTSEL mode were found.
+RP2040 device at bus 3, address 14 appears to be in BOOTSEL mode, but picotool was unable to connect.
+Maybe try 'sudo' or check your permissions.
+```
+
+**After adding rules**, `picotool info` should work without sudo.
+
 ---
 
 ## Pico SDK Installation
@@ -570,6 +605,32 @@ git submodule update --init
 
 ### Flashing Issues
 
+#### Problem: picotool can't access Pico in BOOTSEL mode
+
+**Symptoms**:
+```
+No accessible RP-series devices in BOOTSEL mode were found.
+RP2040 device at bus 3, address 14 appears to be in BOOTSEL mode, but picotool was unable to connect.
+Maybe try 'sudo' or check your permissions.
+```
+
+**Solution** - Add udev rules for USB permissions:
+```bash
+# Create udev rules (see "Configure USB Permissions for Pico" section above)
+sudo tee /etc/udev/rules.d/99-pico.rules > /dev/null << 'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0003", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0004", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0005", MODE="0666"
+EOF
+
+# Reload udev rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Unplug and replug the Pico, then test
+picotool info
+```
+
 #### Problem: Pico doesn't mount as RPI-RP2
 
 **Solution 1** - Try different USB cable:
@@ -740,6 +801,15 @@ cd picotool
 mkdir build && cd build
 cmake .. && make -j$(nproc)
 sudo make install
+
+# Configure USB permissions for Pico
+sudo tee /etc/udev/rules.d/99-pico.rules > /dev/null << 'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0003", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0004", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0005", MODE="0666"
+EOF
+sudo udevadm control --reload-rules
+sudo udevadm trigger
 
 # Clone Pico SDK
 cd ~
