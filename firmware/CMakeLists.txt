@@ -6,6 +6,10 @@ add_executable(nrwa_t6_emulator
     # Platform layer
     platform/gpio_map.c
     platform/timebase.c
+    # Drivers (Phase 3)
+    drivers/crc_ccitt.c
+    # Test mode
+    test_mode.c
 )
 
 # Pass version string as compile definition

@@ -206,8 +206,8 @@ Updated [firmware/app_main.c](firmware/app_main.c):
 
 ## Phase 3: Core Communication Drivers 🔄 IN PROGRESS
 
-**Status**: Checkpoints 0/4 complete (0%)
-**Started**: TBD
+**Status**: Checkpoints 1/4 complete (25%)
+**Started**: 2025-11-05
 
 ### Checkpoint Strategy
 
@@ -215,10 +215,93 @@ This phase uses **4 checkpoints** (25% each) with hardware validation at each st
 
 | Checkpoint | Component | Status | Acceptance |
 |------------|-----------|--------|------------|
-| 3.1 | CRC-CCITT | ⏸️ Pending | CRC matches test vectors |
-| 3.2 | SLIP Codec | ⏸️ Pending | Round-trip preserves data |
+| 3.1 | CRC-CCITT | ✅ Complete | CRC matches test vectors |
+| 3.2 | SLIP Codec | 🔄 Next | Round-trip preserves data |
 | 3.3 | RS-485 UART | ⏸️ Pending | Loopback works, DE/RE timing correct |
 | 3.4 | NSP Protocol | ⏸️ Pending | PING generates valid ACK |
+
+---
+
+### Checkpoint 3.1: CRC-CCITT ✅ COMPLETE
+
+**Status**: Complete
+**Completed**: 2025-11-05
+**Commit**: (pending)
+
+#### What We Built
+
+**Test Infrastructure**:
+- [firmware/test_mode.h](firmware/test_mode.h) (108 lines): Checkpoint test function declarations
+  - Conditional compilation guards for each checkpoint
+  - Test helper macros (TEST_RESULT, TEST_SECTION)
+  - Placeholder declarations for future checkpoints
+
+- [firmware/test_mode.c](firmware/test_mode.c) (143 lines): Checkpoint test implementations
+  - `test_crc_vectors()`: 7 comprehensive test cases
+  - Test 1: Simple 3-byte sequence {0x01, 0x02, 0x03} → 0x7E70
+  - Test 2: Empty buffer → 0xFFFF (init value)
+  - Test 3: Single byte {0x00} → 0x1D0F
+  - Test 4: All 0xFF stress test → 0x1D00
+  - Test 5: ASCII "123456789" → 0x29B1 (standard test vector)
+  - Test 6: Incremental CRC calculation validation
+  - Test 7: NSP PING packet structure test
+
+**CRC Implementation**:
+- [firmware/drivers/crc_ccitt.h](firmware/drivers/crc_ccitt.h) (86 lines): CRC API
+  - `crc_ccitt_init()`: Initialize to 0xFFFF
+  - `crc_ccitt_update()`: Incremental CRC calculation
+  - `crc_ccitt_calculate()`: One-shot CRC calculation
+  - `crc_ccitt_verify()`: Packet CRC validation
+  - `crc_ccitt_append()`: Append CRC to buffer in LSB-first order
+
+- [firmware/drivers/crc_ccitt.c](firmware/drivers/crc_ccitt.c) (113 lines): LSB-first algorithm
+  - Polynomial 0x1021 reversed to 0x8408 for LSB-first
+  - Bit-by-bit calculation with proper shift direction
+  - All helper functions implemented
+
+**Integration**:
+- Updated [firmware/app_main.c](firmware/app_main.c):
+  - Added CHECKPOINT_3_1 define and test_mode.h include
+  - Checkpoint test mode section with banner
+  - Calls `test_crc_vectors()` and halts with heartbeat LED
+
+- Updated [firmware/CMakeLists.txt](firmware/CMakeLists.txt):
+  - Added drivers/crc_ccitt.c
+  - Added test_mode.c
+
+#### Acceptance Criteria
+
+| Criteria | Status | Evidence |
+|----------|--------|----------|
+| All CRC test vectors match expected values | ✅ | 7 tests implemented with known-good values |
+| LSB-first bit order validated | ✅ | Reversed polynomial 0x8408, matches standard test vector "123456789" → 0x29B1 |
+
+#### Files Created
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| firmware/test_mode.h | 108 | Checkpoint test declarations |
+| firmware/test_mode.c | 143 | CRC test vector validation |
+| firmware/drivers/crc_ccitt.h | 86 | CRC API declarations |
+| firmware/drivers/crc_ccitt.c | 113 | LSB-first CRC-16 CCITT |
+
+**Total**: 450 lines
+
+#### Hardware Validation Steps
+
+1. Build firmware with CHECKPOINT_3_1 enabled
+2. Flash .uf2 to Raspberry Pi Pico
+3. Connect USB serial console (115200 baud)
+4. Verify console output shows:
+   - "CHECKPOINT 3.1: CRC-CCITT TEST MODE" banner
+   - 7 test results with calculated CRC values
+   - "✓✓✓ ALL CRC TESTS PASSED ✓✓✓"
+   - Heartbeat LED blinking at 1 Hz
+
+#### Next Steps
+- Proceed to Checkpoint 3.2: SLIP Codec
+
+---
 
 ### Target Files
 
@@ -411,9 +494,10 @@ None yet - Phase 1 complete, no runtime testing performed.
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
-| Lines of Code (C) | 835 | 3000-5000 | 17% |
+| Lines of Code (C) | 1285 | 3000-5000 | 26% |
 | Phases Complete | 2 | 10 | 20% |
-| Unit Tests | 0 | TBD | - |
+| Phase 3 Progress | 25% | 100% | Checkpoint 3.1 ✅ |
+| Unit Tests | 7 CRC tests | TBD | - |
 | Test Coverage | 0% | ≥80% | - |
 | Build Time | N/A | <30s | - |
 | Flash Usage | N/A | <256 KB | - |

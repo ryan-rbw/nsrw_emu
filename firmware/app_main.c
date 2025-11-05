@@ -21,6 +21,14 @@
 #include "gpio_map.h"
 #include "timebase.h"
 
+// Checkpoint control (uncomment to enable specific checkpoint tests)
+#define CHECKPOINT_3_1  // CRC-CCITT test vectors
+
+// Test mode
+#ifdef CHECKPOINT_3_1
+#include "test_mode.h"
+#endif
+
 // Firmware version (passed from CMake)
 #ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION "v0.1.0-unknown"
@@ -94,6 +102,38 @@ int main(void) {
 
     // TODO: Phase 3 - Initialize drivers (RS-485, SLIP, NSP)
     // TODO: Phase 8 - Initialize console/TUI
+
+    // ========================================================================
+    // CHECKPOINT 3.1: CRC-CCITT Test Mode
+    // ========================================================================
+    #ifdef CHECKPOINT_3_1
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 3.1: CRC-CCITT TEST MODE                      ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+
+    // Run CRC test vectors
+    test_crc_vectors();
+
+    printf("\n");
+    printf("Test complete. Halting in checkpoint mode.\n");
+    printf("Heartbeat LED will continue blinking.\n");
+    printf("\n");
+
+    // Halt here - just blink LED to show we're alive
+    while (1) {
+        static uint32_t blink_counter = 0;
+        if (blink_counter++ >= 500) {
+            blink_counter = 0;
+            static bool led = false;
+            led = !led;
+            gpio_set_heartbeat_led(led);
+        }
+        sleep_ms(1);
+    }
+    #endif
+    // ========================================================================'
 
     printf("[Core0] Launching Core1 for physics simulation...\n");
 
