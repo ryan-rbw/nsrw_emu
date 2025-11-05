@@ -123,73 +123,106 @@ ls $PICO_SDK_PATH/cmake  # Should show CMake files
 
 ## Building the Firmware
 
-### Step 1: Navigate to Project Directory
+### Method 1: Using build.sh (Recommended)
+
+The easiest way to build is using the provided build script:
 
 ```bash
+# Navigate to project directory
 cd /home/rwhite/src/nsrw_emu
+
+# Run build script
+./build.sh
 ```
 
-Or wherever you cloned this repository.
+The script will:
+1. Check for Pico SDK (uses `~/pico-sdk` by default)
+2. Create/configure build directory
+3. Build the firmware
+4. Convert ELF to UF2 format
+5. Show flash instructions
 
-### Step 2: Create Build Directory
-
-```bash
-# Create build directory (first time only)
-mkdir -p build
-
-# Enter build directory
-cd build
+**Expected output**:
 ```
-
-### Step 3: Configure with CMake
-
-```bash
-# Configure the build system
-cmake ..
-```
-
-**Expected output** (key lines):
-```
--- The C compiler identification is GNU 10.3.1
--- The CXX compiler identification is GNU 10.3.1
--- PICO_SDK_PATH is /home/username/pico-sdk
--- Build type is Release
--- Pico board: pico
--- Configuring done
--- Generating done
--- Build files have been written to: /home/rwhite/src/nsrw_emu/build
-```
-
-If you see errors here, see [Troubleshooting](#troubleshooting).
-
-### Step 4: Build the Firmware
-
-```bash
-# Build (use all CPU cores for speed)
-make -j$(nproc)
-```
-
-**Expected output** (last lines):
-```
-[100%] Linking CXX executable nrwa_t6_emulator.elf
-   text    data     bss     dec     hex filename
-  45678    1234    5678   52590    cd6e nrwa_t6_emulator.elf
+=== Building NRWA-T6 Emulator ===
+Using Pico SDK: /home/username/pico-sdk
+Building firmware...
 [100%] Built target nrwa_t6_emulator
+Converting ELF to UF2...
+
+=== Build successful ===
+Output files:
+-rwxrwxr-x 1 user user 729K firmware/nrwa_t6_emulator.elf
+-rw-rw-r-- 1 user user  72K firmware/nrwa_t6_emulator.uf2
 ```
 
-### Step 5: Verify Output Files
+### Method 2: Manual Build
+
+If you prefer manual control or need to customize the build:
 
 ```bash
-# Check for UF2 file (this is what you flash to Pico)
-ls -lh firmware/nrwa_t6_emulator.uf2
+# Navigate to project
+cd /home/rwhite/src/nsrw_emu
 
-# You should also see:
-ls -lh firmware/nrwa_t6_emulator.elf  # ELF binary
-ls -lh firmware/nrwa_t6_emulator.bin  # Raw binary
-ls -lh firmware/nrwa_t6_emulator.hex  # Intel HEX format
+# Create and enter build directory
+mkdir -p build && cd build
+
+# Configure with CMake
+cmake ..
+
+# Build
+make -j$(nproc)
+
+# Convert ELF to UF2 (required step)
+_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
-**The .uf2 file** is what you'll flash to the Pico.
+**Important Notes:**
+- The standard `pico_add_extra_outputs()` is disabled due to a QEMU crash issue
+- You must manually convert ELF→UF2 using picotool (or use build.sh)
+- The build script automatically handles this for you
+
+### After Code Changes
+
+When you modify source files, rebuild with:
+
+```bash
+# Using build script (recommended)
+./build.sh
+
+# OR manually
+cd build
+make -j$(nproc)
+_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+```
+
+### Clean Rebuild
+
+If you encounter issues or want a fresh build:
+
+```bash
+# Remove build directory and rebuild
+rm -rf build
+./build.sh
+
+# OR manually
+rm -rf build
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
+```
+
+### Build Output Files
+
+After a successful build, you'll have:
+
+```bash
+build/firmware/nrwa_t6_emulator.elf  # 729KB ARM Cortex-M0+ executable
+build/firmware/nrwa_t6_emulator.uf2  #  72KB flashable image for Pico
+```
+
+**The .uf2 file** is what you flash to the Pico.
 
 ---
 
@@ -630,15 +663,11 @@ sudo usermod -a -G dialout $USER
 # Navigate to project
 cd /home/rwhite/src/nsrw_emu
 
-# Configure (first time only)
-mkdir -p build && cd build
-cmake ..
-
-# Build
-make -j$(nproc)
+# Build firmware (recommended method)
+./build.sh
 
 # Flash (Pico in BOOTSEL mode)
-cp firmware/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
+cp build/firmware/nrwa_t6_emulator.uf2 /media/$USER/RPI-RP2/
 
 # Connect console
 screen /dev/ttyACM0 115200
@@ -648,18 +677,31 @@ screen /dev/ttyACM0 115200
 ### Rebuild After Code Changes
 
 ```bash
+# Recommended: Use build script
+cd /home/rwhite/src/nsrw_emu
+./build.sh
+
+# Alternative: Manual rebuild
 cd /home/rwhite/src/nsrw_emu/build
 make -j$(nproc)
-# Flash and test as above
+_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
 ### Clean Build (if needed)
 
 ```bash
-cd /home/rwhite/src/nsrw_emu/build
-rm -rf *
+# Recommended: Use build script
+cd /home/rwhite/src/nsrw_emu
+rm -rf build
+./build.sh
+
+# Alternative: Manual clean build
+cd /home/rwhite/src/nsrw_emu
+rm -rf build
+mkdir build && cd build
 cmake ..
 make -j$(nproc)
+_deps/picotool/picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 ```
 
 ---
