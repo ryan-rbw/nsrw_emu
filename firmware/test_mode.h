@@ -27,7 +27,6 @@
 // Phase 3: Core Communication Drivers
 // ============================================================================
 
-#ifdef CHECKPOINT_3_1
 /**
  * @brief Test CRC-CCITT implementation with known test vectors
  *
@@ -38,11 +37,10 @@
  * - Edge cases (empty buffer, single byte, etc.)
  *
  * Prints results to console.
+ * Enable with: #define CHECKPOINT_3_1
  */
 void test_crc_vectors(void);
-#endif // CHECKPOINT_3_1
 
-#ifdef CHECKPOINT_3_2
 /**
  * @brief Test SLIP encoder/decoder with edge cases
  *
@@ -53,11 +51,10 @@ void test_crc_vectors(void);
  * - Empty frames
  *
  * Prints results to console.
+ * Enable with: #define CHECKPOINT_3_2
  */
 void test_slip_codec(void);
-#endif // CHECKPOINT_3_2
 
-#ifdef CHECKPOINT_3_3
 /**
  * @brief Test RS-485 UART with software loopback
  *
@@ -68,11 +65,10 @@ void test_slip_codec(void);
  * - Buffer management
  *
  * Prints results to console.
+ * Enable with: #define CHECKPOINT_3_3
  */
 void test_rs485_loopback(void);
-#endif // CHECKPOINT_3_3
 
-#ifdef CHECKPOINT_3_4
 /**
  * @brief Test NSP protocol with PING/ACK exchange
  *
@@ -83,9 +79,10 @@ void test_rs485_loopback(void);
  * - ACK generation
  *
  * Prints results to console.
+ * Enable with: #define CHECKPOINT_3_4
  */
 void test_nsp_ping(void);
-#endif // CHECKPOINT_3_4
+
 
 // ============================================================================
 // Phase 4: Utilities Foundation (future checkpoints)

@@ -44,7 +44,8 @@ pico_enable_stdio_usb(nrwa_t6_emulator 1)
 pico_enable_stdio_uart(nrwa_t6_emulator 0)
 
 # Create map/bin/hex/uf2 files
-pico_add_extra_outputs(nrwa_t6_emulator)
+# Temporarily disabled due to QEMU/picotool crash - will use elf2uf2 manually
+# pico_add_extra_outputs(nrwa_t6_emulator)
 
 # Print memory usage
 add_custom_command(TARGET nrwa_t6_emulator POST_BUILD

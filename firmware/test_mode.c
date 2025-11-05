@@ -8,27 +8,14 @@
 #include <string.h>
 
 // Include checkpoint-specific modules
-#ifdef CHECKPOINT_3_1
 #include "crc_ccitt.h"
-#endif
-
-#ifdef CHECKPOINT_3_2
-#include "slip.h"
-#endif
-
-#ifdef CHECKPOINT_3_3
-#include "rs485_uart.h"
-#endif
-
-#ifdef CHECKPOINT_3_4
-#include "nsp.h"
-#endif
+// #include "slip.h"       // Checkpoint 3.2
+// #include "rs485_uart.h" // Checkpoint 3.3
+// #include "nsp.h"        // Checkpoint 3.4
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
 // ============================================================================
-
-#ifdef CHECKPOINT_3_1
 
 /**
  * @brief Test CRC-CCITT implementation with known vectors
@@ -126,32 +113,32 @@ void test_crc_vectors(void) {
     printf("\n");
 }
 
-#endif // CHECKPOINT_3_1
-
 // ============================================================================
-// Future checkpoint implementations will go here
+// Checkpoint 3.2: SLIP Codec (future)
 // ============================================================================
 
-#ifdef CHECKPOINT_3_2
 void test_slip_codec(void) {
     TEST_SECTION("Checkpoint 3.2: SLIP Codec");
     // Implementation in future checkpoint
     printf("Not yet implemented.\n");
 }
-#endif
 
-#ifdef CHECKPOINT_3_3
+// ============================================================================
+// Checkpoint 3.3: RS-485 UART Loopback (future)
+// ============================================================================
+
 void test_rs485_loopback(void) {
     TEST_SECTION("Checkpoint 3.3: RS-485 UART Loopback");
     // Implementation in future checkpoint
     printf("Not yet implemented.\n");
 }
-#endif
 
-#ifdef CHECKPOINT_3_4
+// ============================================================================
+// Checkpoint 3.4: NSP Protocol (future)
+// ============================================================================
+
 void test_nsp_ping(void) {
     TEST_SECTION("Checkpoint 3.4: NSP Protocol");
     // Implementation in future checkpoint
     printf("Not yet implemented.\n");
 }
-#endif
