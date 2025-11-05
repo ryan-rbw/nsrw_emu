@@ -3,15 +3,48 @@
 # Build script for NRWA-T6 Emulator
 # Builds firmware and converts to UF2 format for Pico
 #
+# Usage:
+#   ./build.sh          - Normal build (incremental)
+#   ./build.sh --clean  - Clean rebuild (removes build directory)
+#
 
 set -e  # Exit on error
 
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+CLEAN_BUILD=false
+if [ "$1" == "--clean" ] || [ "$1" == "-c" ]; then
+    CLEAN_BUILD=true
+fi
+
+# Show usage if help requested
+if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --clean, -c    Clean rebuild (removes build directory)"
+    echo "  --help, -h     Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0             # Normal incremental build"
+    echo "  $0 --clean     # Clean rebuild from scratch"
+    exit 0
+fi
+
 echo -e "${GREEN}=== Building NRWA-T6 Emulator ===${NC}"
+
+# Handle clean build
+if [ "$CLEAN_BUILD" = true ]; then
+    if [ -d "build" ]; then
+        echo -e "${YELLOW}Removing build directory for clean rebuild...${NC}"
+        rm -rf build
+    fi
+fi
 
 # Check for Pico SDK
 if [ -z "$PICO_SDK_PATH" ]; then
@@ -20,7 +53,7 @@ if [ -z "$PICO_SDK_PATH" ]; then
 fi
 
 if [ ! -d "$PICO_SDK_PATH" ]; then
-    echo "ERROR: Pico SDK not found at $PICO_SDK_PATH"
+    echo -e "${RED}ERROR: Pico SDK not found at $PICO_SDK_PATH${NC}"
     echo "Please install the Pico SDK or set PICO_SDK_PATH"
     exit 1
 fi
