@@ -96,7 +96,77 @@ reaction-wheel-emulator/
 
 ---
 
-## 3. Implementation Phases
+## 3. Checkpoint-Based Development Strategy
+
+### 3.1 Philosophy
+
+To enable **incremental hardware validation**, each phase is broken into **testable checkpoints**. Every checkpoint:
+1. **Builds and flashes** to Pico (produces working `.uf2`)
+2. **Demonstrates functionality** via USB console or LED feedback
+3. **Can be validated** on real hardware without waiting for phase completion
+4. **Commits separately** for safe rollback points
+
+### 3.2 Test Mode Infrastructure
+
+**File**: `firmware/test_mode.c` + `test_mode.h`
+
+Provides checkpoint test functions that can be invoked from `app_main.c`:
+- Controlled via `#define CHECKPOINT_X_Y` compile-time flags
+- Each checkpoint has dedicated test function (e.g., `test_crc_vectors()`)
+- Tests print results to USB console for visual verification
+- Can halt execution (`while(1)`) or return to main loop
+
+**Example**:
+```c
+// test_mode.h
+#ifdef CHECKPOINT_3_1
+void test_crc_vectors(void);
+#endif
+
+// app_main.c
+#define CHECKPOINT_3_1  // Enable this checkpoint
+#include "test_mode.h"
+
+int main(void) {
+    stdio_init_all();
+    sleep_ms(2000);
+
+    #ifdef CHECKPOINT_3_1
+    test_crc_vectors();
+    while(1) { sleep_ms(1000); }  // Stop here for testing
+    #endif
+
+    // Normal main loop...
+}
+```
+
+### 3.3 Checkpoint Progress Tracking
+
+**In PROGRESS.md**: Track sub-phase completion
+- Phase 3: 0% → 25% → 50% → 75% → 100%
+- Each checkpoint updates the percentage
+- Final phase completion includes all checkpoint commits
+
+**Commit Strategy**:
+```
+Checkpoint 3.1: CRC-CCITT implementation and validation
+
+- Implemented crc_ccitt.c/h with CCITT polynomial
+- Added test_mode.c infrastructure
+- Test vectors validate LSB-first bit order
+- Console output shows all tests passing
+
+Checkpoint acceptance: ✅ CRC matches known test vectors
+Phase 3 progress: 25% (1/4 checkpoints)
+```
+
+### 3.4 Phase-Specific Checkpoints
+
+Each phase below lists its checkpoints with acceptance criteria.
+
+---
+
+## 4. Implementation Phases
 
 ### Phase 1: Project Foundation ⚙️
 
@@ -167,54 +237,137 @@ reaction-wheel-emulator/
 
 **Goal**: RS-485, SLIP, NSP, CRC working end-to-end
 
-**Tasks**:
+**Checkpoints**: 4 (25% each)
 
-#### 3.1 CRC-CCITT (`crc_ccitt.c`)
+---
+
+#### Checkpoint 3.1: CRC-CCITT ✅ (25%)
+
+**Implement**: `drivers/crc_ccitt.c` + `crc_ccitt.h`
+
+**Details**:
 - Init: 0xFFFF
 - Polynomial: 0x1021
-- Bit order: LSB-first per [SPEC.md:44](SPEC.md#L44)
-- Test vectors from standard
+- **Bit order: LSB-first** per [SPEC.md:44](SPEC.md#L44) (CRITICAL!)
 - `uint16_t crc_ccitt(const uint8_t *data, size_t len)`
 
-#### 3.2 SLIP Codec (`slip.c`)
+**Test Mode**: `test_crc_vectors()` in `test_mode.c`
+- Test vector 1: `{0x01, 0x02, 0x03}` → Known CRC
+- Test vector 2: Empty buffer → 0xFFFF
+- Test vector 3: NSP PING packet → Validate against spec
+- Test vector 4: Long buffer (256 bytes) → Performance check
+
+**Hardware Validation**:
+1. Flash to Pico
+2. Connect USB console (`screen /dev/ttyACM0 115200`)
+3. See test results printed:
+   ```
+   === Checkpoint 3.1: CRC-CCITT Test ===
+   Test 1: {0x01, 0x02, 0x03} → CRC=0xXXXX ✓
+   Test 2: Empty buffer → CRC=0xFFFF ✓
+   Test 3: PING packet → CRC=0xYYYY ✓
+   All tests PASSED
+   ```
+
+**Acceptance**: ✅ All CRC test vectors match expected values
+
+---
+
+#### Checkpoint 3.2: SLIP Codec ✅ (50%)
+
+**Implement**: `drivers/slip.c` + `slip.h`
+
+**Details**:
 - Constants: END=0xC0, ESC=0xDB, ESC_END=0xDC, ESC_ESC=0xDD
 - State machine encoder/decoder
-- Edge cases: leading/trailing END, escaped bytes
+- Edge cases: leading/trailing END, escaped bytes, consecutive ESC
 - `slip_encode(in, in_len, out, out_max) → out_len`
 - `slip_decode(in, in_len, out, out_max) → out_len or -1`
 
-#### 3.3 RS-485 UART (`rs485_uart.c`)
-- UART1 config: 460800 baud, 8-N-1
-- DE/RE timing: DE high 10µs before TX, low 10µs after
-- Tri-state when idle (multi-drop TXD sharing)
-- Redundancy: Primary/backup port switching on CRC fail
-- RX ring buffer (1KB)
-- `rs485_send(data, len)`
-- `rs485_recv(buf, max) → len`
+**Test Mode**: `test_slip_codec()` in `test_mode.c`
+- Test 1: Simple packet `{0x01, 0x02}` → `{END, 0x01, 0x02, END}`
+- Test 2: Packet with END `{0xC0, 0x01}` → `{END, ESC, ESC_END, 0x01, END}`
+- Test 3: Packet with ESC `{0xDB, 0x01}` → `{END, ESC, ESC_ESC, 0x01, END}`
+- Test 4: Round-trip: encode → decode → verify original
+- Test 5: Malformed frame (missing END) → Error handling
 
-#### 3.4 NSP Protocol (`nsp.c`)
+**Hardware Validation**:
+1. Flash to Pico
+2. Console shows encode/decode tests with hex dumps
+3. LED blinks to indicate test progress
+
+**Acceptance**: ✅ SLIP round-trip preserves data, edge cases handled
+
+---
+
+#### Checkpoint 3.3: RS-485 UART (Software Loopback) ✅ (75%)
+
+**Implement**: `drivers/rs485_uart.c` + `rs485_uart.h`
+
+**Details**:
+- UART1 config: 460800 baud, 8-N-1
+- DE/RE timing: DE high 10µs before TX, low 10µs after (use `timebase_delay_us()`)
+- **Software loopback mode** for testing (UART TX → RX internally via Pico SDK)
+- Optional: RS-232 mode (no DE/RE control) for simpler validation
+- RX ring buffer (1KB)
+- `rs485_init()`, `rs485_send(data, len)`, `rs485_recv(buf, max) → len`
+
+**Test Mode**: `test_uart_loopback()` in `test_mode.c`
+- Test 1: Send "HELLO" → Receive "HELLO" (loopback)
+- Test 2: Send 256-byte buffer → Verify received
+- Test 3: DE/RE timing: Print timestamps, verify 10µs delays
+- Test 4: Baud rate: Measure with `timebase_get_us()`
+
+**Hardware Validation**:
+1. Flash to Pico
+2. Console shows TX/RX data matching
+3. LED toggles on each TX/RX byte
+4. Optional: Scope on GP6 (DE) and GP7 (RE) to verify timing
+
+**Acceptance**: ✅ UART loopback works, DE/RE timing correct (±2µs)
+
+---
+
+#### Checkpoint 3.4: NSP Protocol (PING Responder) ✅ (100%)
+
+**Implement**: `drivers/nsp.c` + `nsp.h`, `drivers/leds.c` + `leds.h`
+
+**Details**:
 - Message Control byte: `[Poll:1|B:1|A:1|Command:5]`
 - Packet layout: `[Dest|Src|Ctrl|Len|Data...|CRC_L|CRC_H]`
-- Command dispatch table for handlers
-- ACK/NACK generation
+- Command dispatch: Implement PING (0x00) handler only
+- ACK generation with correct CRC
 - `nsp_parse(slip_frame) → command_id, payload`
 - `nsp_build_reply(ack, data) → slip_frame`
 
-#### 3.5 LEDs (`leds.c`)
-- Status LED: Blink pattern for comms activity
-- Fault LED: Solid on fault, blink on warning
+**Test Mode**: `test_nsp_ping()` in `test_mode.c`
+- Test 1: Build PING packet (0x00), compute CRC, encode SLIP
+- Test 2: Parse received PING, generate ACK reply
+- Test 3: Full round-trip: PING → parse → ACK → verify
+- LED patterns: Blink on PING received, solid for 1s on ACK sent
 
-**Deliverables**:
-- `drivers/crc_ccitt.c` + unit tests
-- `drivers/slip.c` + unit tests
-- `drivers/rs485_uart.c`
-- `drivers/nsp.c`
-- `drivers/leds.c`
+**Hardware Validation**:
+1. Flash to Pico
+2. Run `tools/host_tester.py --ping` (or manual packet via console)
+3. See PING request logged, ACK reply sent
+4. LED feedback confirms packet processing
 
-**Acceptance**:
-- PING command (0x00) → ACK reply validated with logic analyzer
-- CRC matches test vectors
-- SLIP handles escaped bytes correctly
+**Acceptance**: ✅ PING command generates valid ACK with correct CRC
+
+---
+
+**Phase 3 Final Deliverables**:
+- `drivers/crc_ccitt.c/h`
+- `drivers/slip.c/h`
+- `drivers/rs485_uart.c/h`
+- `drivers/nsp.c/h`
+- `drivers/leds.c/h`
+- `test_mode.c/h` (checkpoint infrastructure)
+
+**Phase 3 Final Acceptance**:
+- All 4 checkpoints passing on hardware
+- End-to-end: Host sends SLIP-encoded NSP PING → Emulator replies with ACK
+- CRC validated, SLIP framing correct, UART timing within spec
 
 ---
 
@@ -222,35 +375,77 @@ reaction-wheel-emulator/
 
 **Goal**: Support libraries for device model
 
-**Tasks**:
+**Checkpoints**: 2 (50% each)
 
-#### 4.1 Ring Buffer (`ringbuf.c`)
+---
+
+#### Checkpoint 4.1: Ring Buffer ✅ (50%)
+
+**Implement**: `util/ringbuf.c` + `ringbuf.h`
+
+**Details**:
 - Lock-free SPSC (single producer, single consumer)
 - Power-of-2 size for fast modulo
 - Memory barriers for inter-core safety
-- `ringbuf_push(rb, item)`
-- `ringbuf_pop(rb, item) → bool`
+- `ringbuf_init(rb, size)`, `ringbuf_push(rb, item)`, `ringbuf_pop(rb, item) → bool`
 
-#### 4.2 Fixed-Point Math (`fixedpoint.h`)
-- UQ14.18: Speed (rpm)
-- UQ16.16: Voltage (V)
-- UQ18.14: Torque (mN·m), current (mA), power (mW)
-- Conversions: `float_to_uq14_18(f) → uint32_t`
+**Test Mode**: `test_ringbuf_stress()` in `test_mode.c`
+- Test 1: Push/pop 1000 items, verify FIFO order
+- Test 2: Fill buffer, verify full detection
+- Test 3: Empty buffer, verify empty detection
+- Test 4: Stress test: 1M push/pop cycles, measure time
+
+**Hardware Validation**:
+1. Flash to Pico
+2. Console shows test progress and results
+3. LED blinks at different rates for test phases
+
+**Acceptance**: ✅ Ring buffer survives 1M cycles, no data corruption
+
+---
+
+#### Checkpoint 4.2: Fixed-Point Math ✅ (100%)
+
+**Implement**: `util/fixedpoint.h` (header-only library)
+
+**Details**:
+- UQ14.18: Speed (RPM) - `uint32_t`
+- UQ16.16: Voltage (V) - `uint32_t`
+- UQ18.14: Torque (mN·m), current (mA), power (mW) - `uint32_t`
+- Conversions: `float_to_uqX_Y()`, `uqX_Y_to_float()`
 - Arithmetic: Saturating add/sub, multiply with shift
 
-**Deliverables**:
-- `util/ringbuf.c` + unit tests
-- `util/fixedpoint.h` + unit tests
+**Test Mode**: `test_fixedpoint_accuracy()` in `test_mode.c`
+- Test 1: RPM conversions (0, 3000, 5000, 6000 RPM)
+- Test 2: Voltage conversions (0.0, 28.0, 36.0 V)
+- Test 3: Torque/current/power conversions
+- Test 4: Arithmetic: Add 100mA + 200mA = 300mA (verify)
+- Test 5: Saturation: UQ18.14 max value + 1 → saturates
 
-**Acceptance**:
-- Ring buffer survives 1M push/pop cycles
-- Fixed-point conversions match reference within 1 LSB
+**Hardware Validation**:
+1. Flash to Pico
+2. Console shows float → fixed → float round-trip errors
+3. All errors < 1 LSB tolerance
+
+**Acceptance**: ✅ Fixed-point conversions within 1 LSB of reference
+
+---
+
+**Phase 4 Final Deliverables**:
+- `util/ringbuf.c/h`
+- `util/fixedpoint.h`
+
+**Phase 4 Final Acceptance**:
+- Ring buffer ready for Core1 ↔ Core0 telemetry
+- Fixed-point math ready for physics calculations
 
 ---
 
 ### Phase 5: Device Model & Physics ⚙️
 
 **Goal**: Wheel dynamics simulation running on Core1
+
+**Checkpoints**: 3 (Register map 33%, Physics model 66%, Core1 integration 100%)
 
 **Tasks**:
 
@@ -316,6 +511,11 @@ reaction-wheel-emulator/
 
 **Goal**: NSP command handlers and telemetry blocks
 
+**Checkpoints**: 2 (Commands 50%, Telemetry 100%)
+- **6.1**: Implement all 8 NSP command handlers (PEEK/POKE/etc.)
+- **6.2**: Implement 5 telemetry blocks (STANDARD/TEMP/VOLT/CURR/DIAG)
+- **Test**: Use host_tester.py to request telemetry, verify block sizes/formats
+
 **Tasks**:
 
 #### 6.1 Commands (`nss_nrwa_t6_commands.c`)
@@ -363,6 +563,11 @@ Each field encoded in UQ format per ICD
 
 **Goal**: Soft/hard protections and fault semantics
 
+**Checkpoints**: 2 (Protections 50%, Fault logic 100%)
+- **7.1**: Implement hard/soft protections (overvoltage, overcurrent, overspeed)
+- **7.2**: Implement fault latching and CLEAR-FAULT selective clearing
+- **Test**: Trigger overspeed fault at 6000 RPM, verify CLEAR-FAULT resets
+
 **Tasks**:
 
 #### 7.1 Protection Thresholds (`nss_nrwa_t6_protection.c`)
@@ -405,6 +610,12 @@ Each field encoded in UQ format per ICD
 ### Phase 8: Console & TUI 🖥️
 
 **Goal**: USB-CDC terminal with table/field catalog and command palette
+
+**Checkpoints**: 3 (Menu UI 33%, Tables/Fields 66%, Command palette 100%)
+- **8.1**: Implement menu system with 7 tables
+- **8.2**: Implement table/field catalog with metadata
+- **8.3**: Implement command palette (help, get, set, describe, etc.)
+- **Test**: Navigate menus, read/write fields, verify defaults tracking
 
 **Tasks**:
 
@@ -482,6 +693,11 @@ Available commands:
 
 **Goal**: JSON scenario loader and runtime injection
 
+**Checkpoints**: 2 (JSON parser 50%, Scenario engine 100%)
+- **9.1**: Implement JSON parser for scenario files
+- **9.2**: Implement scenario engine with timeline and injection actions
+- **Test**: Load overspeed scenario, verify fault triggers at correct time
+
 **Tasks**:
 
 #### 9.1 JSON Schema Validation
@@ -526,6 +742,12 @@ Available commands:
 ### Phase 10: Main Application & Dual-Core 🚀
 
 **Goal**: Orchestrate Core0/Core1, watchdog, startup
+
+**Checkpoints**: 3 (Core integration 33%, Host tools 66%, Final integration 100%)
+- **10.1**: Complete Core0/Core1 integration with multicore launch
+- **10.2**: Implement host_tester.py and errorgen.py tools
+- **10.3**: Full system integration test and 24h soak test
+- **Test**: End-to-end validation with OBC sending NSP commands
 
 **Tasks**:
 
