@@ -18,10 +18,22 @@ Phases 6-10 currently have checkpoint counts declared but use inconsistent forma
 ## Completed
 
 ✅ **Phase 1**: Project Foundation (no checkpoints - single deliverable)
+
 ✅ **Phase 2**: Platform Layer (no checkpoints - single deliverable)
+
 ✅ **Phase 3**: Core Communication Drivers (4 checkpoints) - **PROPERLY FORMATTED**
+
+- ✅ Checkpoint 3.1: CRC-CCITT (hardware validated)
+- ✅ Checkpoint 3.2: SLIP Codec (hardware validated)
+- ✅ Checkpoint 3.3: RS-485 UART (hardware validated)
+- ✅ Checkpoint 3.4: NSP Protocol (hardware validated)
+
 ✅ **Phase 4**: Utilities Foundation (2 checkpoints) - **PROPERLY FORMATTED**
-✅ **Phase 5**: Device Model & Physics (3 checkpoints) - **PROPERLY FORMATTED** ✨ JUST COMPLETED
+
+- ✅ Checkpoint 4.1: Ring Buffer (hardware validated) ✨ JUST COMPLETED
+- ⏳ Checkpoint 4.2: Fixed-Point Math (not started)
+
+⏳ **Phase 5**: Device Model & Physics (3 checkpoints) - **PROPERLY FORMATTED** (not started)
 
 ## Remaining Work
 
