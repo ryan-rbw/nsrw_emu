@@ -435,8 +435,30 @@ void test_rs485_loopback(void) {
         printf("  (Skipped - not counting toward pass/fail)\n");
     }
 
-    // Test 6: Timing verification
-    printf("\nTest 6: Timing and Baud Rate\n");
+    // Test 6: LED Strobe Test (continuous transmission for visual feedback)
+    printf("\nTest 6: LED Strobe Test\n");
+    printf("  Sending data to strobe LEDs...\n");
+    printf("  Watch GPIO 4 (TX), GPIO 6 (DE), GPIO 7 (RE) LEDs!\n");
+    printf("  (Sending 1000 bytes in 10 bursts with 200ms pauses)\n");
+
+    uint8_t strobe_pattern[100];
+    for (int i = 0; i < 100; i++) {
+        strobe_pattern[i] = (uint8_t)(i * 0xAA);  // Varying pattern
+    }
+
+    for (int burst = 0; burst < 10; burst++) {
+        rs485_send(strobe_pattern, sizeof(strobe_pattern));
+        sleep_ms(200);  // Longer pause for better LED visibility
+        printf(".");
+    }
+    printf(" Done!\n");
+
+    printf("  Total: 1000 bytes transmitted\n");
+    printf("  You should have seen GPIO 6/7 (DE/RE) strobing!\n");
+    TEST_RESULT("Test 6 (LED strobe)", true);
+
+    // Test 7: Timing verification
+    printf("\nTest 7: Timing and Baud Rate\n");
     printf("  Baud rate: 460800 bps\n");
     printf("  Bit time: ~2.17 µs\n");
     printf("  Byte time (10 bits): ~21.7 µs\n");
@@ -461,7 +483,7 @@ void test_rs485_loopback(void) {
 
     // Allow some tolerance for timing (1-5 ms is reasonable with delays)
     bool timing_ok = (elapsed_us > 1000) && (elapsed_us < 5000);
-    TEST_RESULT("Test 6 (timing)", timing_ok);
+    TEST_RESULT("Test 7 (timing)", timing_ok);
     all_passed &= timing_ok;
 
     // Final result

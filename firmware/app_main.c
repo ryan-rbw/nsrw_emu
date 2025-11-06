@@ -21,10 +21,10 @@
 #include "gpio_map.h"
 #include "timebase.h"
 
-// Checkpoint control (uncomment to enable specific checkpoint tests)
-//#define CHECKPOINT_3_1  // CRC-CCITT test vectors
-//#define CHECKPOINT_3_2  // SLIP codec
-//#define CHECKPOINT_3_3  // RS-485 UART loopback
+// Checkpoint control - Enable all checkpoints to run sequentially
+#define CHECKPOINT_3_1  // CRC-CCITT test vectors
+#define CHECKPOINT_3_2  // SLIP codec
+#define CHECKPOINT_3_3  // RS-485 UART loopback
 #define CHECKPOINT_3_4  // NSP Protocol PING responder
 
 // Test mode
@@ -107,34 +107,30 @@ int main(void) {
     // TODO: Phase 8 - Initialize console/TUI
 
     // ========================================================================
+    // PHASE 3 CHECKPOINT TEST SUITE
+    // ========================================================================
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4)
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  PHASE 3: CORE COMMUNICATION DRIVERS - TEST SUITE        ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    printf("Running all Phase 3 checkpoints sequentially...\n");
+    printf("\n");
+    #endif
+
+    // ========================================================================
     // CHECKPOINT 3.1: CRC-CCITT Test Mode
     // ========================================================================
     #ifdef CHECKPOINT_3_1
-    printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
-    printf("║  CHECKPOINT 3.1: CRC-CCITT TEST MODE                      ║\n");
+    printf("║  CHECKPOINT 3.1: CRC-CCITT                                ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
-
-    // Run CRC test vectors
     test_crc_vectors();
-
     printf("\n");
-    printf("Test complete. Halting in checkpoint mode.\n");
-    printf("Heartbeat LED will continue blinking.\n");
-    printf("\n");
-
-    // Halt here - just blink LED to show we're alive
-    while (1) {
-        static uint32_t blink_counter = 0;
-        if (blink_counter++ >= 500) {
-            blink_counter = 0;
-            static bool led = false;
-            led = !led;
-            gpio_set_heartbeat_led(led);
-        }
-        sleep_ms(1);
-    }
+    printf("--- Checkpoint 3.1 complete ---\n");
+    sleep_ms(1000);  // Brief pause between checkpoints
     #endif
     // ========================================================================
 
@@ -144,29 +140,13 @@ int main(void) {
     #ifdef CHECKPOINT_3_2
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
-    printf("║  CHECKPOINT 3.2: SLIP CODEC TEST MODE                     ║\n");
+    printf("║  CHECKPOINT 3.2: SLIP CODEC                               ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
-
-    // Run SLIP codec tests
     test_slip_codec();
-
     printf("\n");
-    printf("Test complete. Halting in checkpoint mode.\n");
-    printf("Heartbeat LED will continue blinking.\n");
-    printf("\n");
-
-    // Halt here - just blink LED to show we're alive
-    while (1) {
-        static uint32_t blink_counter = 0;
-        if (blink_counter++ >= 500) {
-            blink_counter = 0;
-            static bool led = false;
-            led = !led;
-            gpio_set_heartbeat_led(led);
-        }
-        sleep_ms(1);
-    }
+    printf("--- Checkpoint 3.2 complete ---\n");
+    sleep_ms(1000);  // Brief pause between checkpoints
     #endif
     // ========================================================================
 
@@ -176,29 +156,13 @@ int main(void) {
     #ifdef CHECKPOINT_3_3
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
-    printf("║  CHECKPOINT 3.3: RS-485 UART LOOPBACK TEST MODE          ║\n");
+    printf("║  CHECKPOINT 3.3: RS-485 UART LOOPBACK                     ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
-
-    // Run RS-485 loopback tests
     test_rs485_loopback();
-
     printf("\n");
-    printf("Test complete. Halting in checkpoint mode.\n");
-    printf("Heartbeat LED will continue blinking.\n");
-    printf("\n");
-
-    // Halt here - just blink LED to show we're alive
-    while (1) {
-        static uint32_t blink_counter = 0;
-        if (blink_counter++ >= 500) {
-            blink_counter = 0;
-            static bool led = false;
-            led = !led;
-            gpio_set_heartbeat_led(led);
-        }
-        sleep_ms(1);
-    }
+    printf("--- Checkpoint 3.3 complete ---\n");
+    sleep_ms(1000);  // Brief pause between checkpoints
     #endif
     // ========================================================================
 
@@ -208,16 +172,26 @@ int main(void) {
     #ifdef CHECKPOINT_3_4
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
-    printf("║  CHECKPOINT 3.4: NSP PROTOCOL PING RESPONDER TEST MODE   ║\n");
+    printf("║  CHECKPOINT 3.4: NSP PROTOCOL PING RESPONDER              ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
-
-    // Run NSP PING tests
     test_nsp_ping();
-
     printf("\n");
-    printf("Test complete. Halting in checkpoint mode.\n");
-    printf("Heartbeat LED will continue blinking.\n");
+    printf("--- Checkpoint 3.4 complete ---\n");
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // ALL CHECKPOINTS COMPLETE - HALT HERE
+    // ========================================================================
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4)
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  ALL PHASE 3 TESTS COMPLETE                               ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    printf("System halting. Heartbeat LED will continue blinking.\n");
+    printf("Press RESET to rerun tests.\n");
     printf("\n");
 
     // Halt here - just blink LED to show we're alive
