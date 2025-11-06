@@ -14,7 +14,7 @@
 | Phase 1: Project Foundation | ✅ Complete | 100% | Build system, minimal app, docs |
 | Phase 2: Platform Layer | ✅ Complete | 100% | GPIO, timebase, board config |
 | Phase 3: Core Drivers | ✅ Complete | 100% | RS-485, SLIP, NSP, CRC - All HW validated |
-| Phase 4: Utilities | 🔄 In Progress | 50% | Ring buffer ✅, fixed-point pending |
+| Phase 4: Utilities | ✅ Complete | 100% | Ring buffer ✅, fixed-point ✅ - HW validated |
 | Phase 5: Device Model | ⏸️ Pending | 0% | Physics simulation |
 | Phase 6: Commands & Telemetry | ⏸️ Pending | 0% | NSP handlers |
 | Phase 7: Protection System | ⏸️ Pending | 0% | Fault management |
@@ -22,7 +22,7 @@
 | Phase 9: Fault Injection | ⏸️ Pending | 0% | JSON scenarios |
 | Phase 10: Integration | ⏸️ Pending | 0% | Dual-core orchestration |
 
-**Overall Completion**: 35% (2.5/10 phases complete, 0.5 in progress)
+**Overall Completion**: 40% (4/10 phases complete)
 
 ---
 
@@ -385,20 +385,21 @@ Brief: NSP protocol handler with PING/ACK exchange. Full packet structure valida
 
 ---
 
-## Phase 4: Utilities Foundation 🔄 IN PROGRESS
+## Phase 4: Utilities Foundation ✅ COMPLETE
 
-**Status**: Checkpoint 1/2 complete (50%)
+**Status**: All 2 checkpoints complete (100%)
 **Started**: 2025-11-06
-**Commits**: `0eefafe`
+**Completed**: 2025-11-06
+**Commits**: `0eefafe`, `a992a0f`
 
 ### Checkpoint Summary
 
-This phase uses **2 checkpoints** (50% each):
+This phase used **2 checkpoints** (50% each):
 
 | Checkpoint | Component | Status | Acceptance |
 |------------|-----------|--------|------------|
 | 4.1 | Ring Buffer | ✅ Complete | 1M push/pop cycles pass |
-| 4.2 | Fixed-Point Math | ⏸️ Pending | Conversions within 1 LSB |
+| 4.2 | Fixed-Point Math | ✅ Complete | Conversions within 1 LSB |
 
 ---
 
@@ -475,11 +476,80 @@ Added to [firmware/test_mode.c](firmware/test_mode.c):
 
 ---
 
-### Target Files
+### Checkpoint 4.2: Fixed-Point Math ✅ COMPLETE
 
-**Utilities**:
-- `firmware/util/ringbuf.c/h` - Lock-free SPSC queue ✅ DONE
-- `firmware/util/fixedpoint.h` - UQ format helpers ⏸️ PENDING
+**Status**: Complete
+**Completed**: 2025-11-06
+**Commit**: `a992a0f`
+
+#### What We Built
+
+**Fixed-Point Library** (header-only):
+
+- [firmware/util/fixedpoint.h](firmware/util/fixedpoint.h) (319 lines): Fixed-point math library
+  - **UQ14.18**: Speed (RPM) - 14 int bits, 18 frac bits - Range: 0-16383, Resolution: 0.0000038
+  - **UQ16.16**: Voltage (V) - 16 int bits, 16 frac bits - Range: 0-65535, Resolution: 0.000015
+  - **UQ18.14**: Torque/Current/Power - 18 int bits, 14 frac bits - Range: 0-262143, Resolution: 0.000061
+  - Conversion functions: `float_to_uqX_Y()`, `uqX_Y_to_float()` with rounding
+  - Saturating arithmetic: add, sub, multiply for all three formats
+  - Resolution query functions
+
+**Test Suite**:
+
+Added to [firmware/test_mode.c](firmware/test_mode.c):
+
+- `test_fixedpoint_accuracy()` function with 7 comprehensive tests:
+  1. UQ14.18 RPM conversions (0, 3000, 5000, 6000 RPM)
+  2. UQ16.16 Voltage conversions (0, 28, 36 V)
+  3. UQ18.14 Torque/Current/Power conversions (0, 100, 500, 1000)
+  4. Addition validation (100mA + 200mA = 300mA)
+  5. Overflow saturation (max + 1 saturates to max)
+  6. Underflow saturation (50 - 100 saturates to 0)
+  7. Multiplication accuracy (2.0 * 3.0 = 6.0)
+
+**Integration**:
+
+- Updated [firmware/app_main.c](firmware/app_main.c:205-214):
+  - Added CHECKPOINT_4_2 define
+  - Test harness for checkpoint 4.2
+  - Sequential execution with all previous checkpoints
+
+- Updated [firmware/test_mode.h](firmware/test_mode.h:116):
+  - Declared `test_fixedpoint_accuracy()` function
+
+#### Acceptance Criteria
+
+| Criteria | Status | Evidence |
+|----------|--------|----------|
+| Float ↔ fixed-point conversions within 1 LSB | ✅ | All conversion tests pass |
+| Arithmetic operations correct | ✅ | Addition, subtraction, multiplication validated |
+| Saturation on overflow/underflow | ✅ | Tests 5 & 6 verify saturation behavior |
+
+#### Hardware Validation
+
+1. Flashed firmware to Raspberry Pi Pico
+2. Connected USB serial console
+3. Observed all checkpoint tests (3.1-3.4, 4.1, 4.2) run sequentially
+4. Fixed-point math tests passed:
+   - All conversions within tolerance
+   - Arithmetic operations accurate
+   - Saturation working correctly
+
+#### Build Metrics
+
+- Firmware size: 824K ELF, 102K UF2 (up from 815K/97K)
+
+---
+
+### Phase 4 Summary
+
+**Files Created**:
+- [firmware/util/ringbuf.c/h](firmware/util/) - Lock-free SPSC ring buffer
+- [firmware/util/fixedpoint.h](firmware/util/) - Fixed-point math (header-only)
+
+**Hardware Validation**: Both checkpoints 4.1-4.2 validated on Raspberry Pi Pico. All tests pass. Utilities foundation complete and ready for Phase 5 physics simulation.
+
+**Next Steps**: Proceed to Phase 5: Device Model & Physics
 
 ---
 
@@ -624,14 +694,14 @@ None yet - Phase 1 complete, no runtime testing performed.
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
-| Lines of Code (C) | ~3500 | 3000-5000 | 70% |
-| Phases Complete | 3 | 10 | 30% |
-| Checkpoints Complete | 9 | ~19 | 47% |
-| Current Phase | Phase 4 | Phase 10 | Checkpoint 4.1 ✅ |
-| Unit Tests | 17 tests | TBD | Phase 3+4.1 |
+| Lines of Code (C) | ~4000 | 3000-5000 | 80% |
+| Phases Complete | 4 | 10 | 40% |
+| Checkpoints Complete | 10 | ~19 | 53% |
+| Current Phase | Phase 5 | Phase 10 | Phase 4 Complete ✅ |
+| Unit Tests | 24 tests | TBD | Phase 3+4 (all) |
 | Test Coverage | N/A | ≥80% | - |
 | Build Time | ~15s | <30s | ✅ |
-| Flash Usage | 97 KB | <256 KB | 38% |
+| Flash Usage | 102 KB | <256 KB | 40% |
 
 ---
 
