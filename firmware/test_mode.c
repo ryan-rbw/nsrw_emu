@@ -16,6 +16,7 @@
 #include "ringbuf.h"    // Checkpoint 4.1
 #include "fixedpoint.h" // Checkpoint 4.2
 #include "nss_nrwa_t6_regs.h" // Checkpoint 5.1
+#include "nss_nrwa_t6_model.h" // Checkpoint 5.2
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
@@ -1283,6 +1284,316 @@ void test_register_map(void) {
         printf("✓✓✓ ALL REGISTER MAP TESTS PASSED ✓✓✓\n");
     } else {
         printf("✗✗✗ SOME REGISTER MAP TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
+}
+
+// ============================================================================
+// Checkpoint 5.2: Wheel Physics Model
+// ============================================================================
+
+/**
+ * @brief Test wheel physics model and control modes
+ *
+ * Validates: Initialization, dynamics, control modes, limits, loss model
+ */
+void test_wheel_physics(void) {
+    TEST_SECTION("Checkpoint 5.2: Wheel Physics Model");
+
+    bool all_passed = true;
+    wheel_state_t state;
+
+    // ========================================================================
+    // Test 1: Initialization
+    // ========================================================================
+    {
+        printf("\n--- Test 1: Model Initialization ---\n");
+
+        wheel_model_init(&state);
+
+        bool passed = true;
+
+        // Check zero initial state
+        if (fabsf(state.omega_rad_s) > 0.001f) {
+            printf("  ERROR: Initial omega should be zero, got %.6f\n", state.omega_rad_s);
+            passed = false;
+        }
+
+        if (fabsf(state.momentum_nms) > 0.001f) {
+            printf("  ERROR: Initial momentum should be zero, got %.6f\n", state.momentum_nms);
+            passed = false;
+        }
+
+        // Check default mode
+        if (state.mode != CONTROL_MODE_CURRENT) {
+            printf("  ERROR: Default mode should be CURRENT, got %d\n", state.mode);
+            passed = false;
+        }
+
+        // Check default protection thresholds
+        if (fabsf(state.overvoltage_threshold_v - DEFAULT_OVERVOLTAGE_V) > 0.1f) {
+            printf("  ERROR: Default overvoltage threshold mismatch\n");
+            passed = false;
+        }
+
+        if (fabsf(state.overspeed_fault_rpm - DEFAULT_OVERSPEED_FAULT_RPM) > 1.0f) {
+            printf("  ERROR: Default overspeed threshold mismatch\n");
+            passed = false;
+        }
+
+        printf("  omega = %.6f rad/s (expected 0.0)\n", state.omega_rad_s);
+        printf("  momentum = %.6f N·m·s (expected 0.0)\n", state.momentum_nms);
+        printf("  mode = %d (expected CURRENT = 0)\n", state.mode);
+        printf("  overvoltage_threshold = %.2f V\n", state.overvoltage_threshold_v);
+        printf("  overspeed_fault = %.2f RPM\n", state.overspeed_fault_rpm);
+
+        TEST_RESULT("Initialization", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // ========================================================================
+    // Test 2: CURRENT Mode - Torque Generation
+    // ========================================================================
+    {
+        printf("\n--- Test 2: CURRENT Mode (i = 1.0 A) ---\n");
+
+        wheel_model_init(&state);
+        wheel_model_set_mode(&state, CONTROL_MODE_CURRENT);
+        wheel_model_set_current(&state, 1.0f);  // 1 A
+
+        // Run one tick
+        wheel_model_tick(&state);
+
+        bool passed = true;
+
+        // Expected torque: τ = k_t · i = 0.0534 N·m/A * 1.0 A = 0.0534 N·m = 53.4 mN·m
+        float expected_torque_mnm = MOTOR_KT_NM_PER_A * 1000.0f;  // 53.4 mN·m
+        float torque_error = fabsf(state.torque_out_mnm - expected_torque_mnm);
+
+        if (torque_error > 0.5f) {  // 0.5 mN·m tolerance
+            printf("  ERROR: Torque mismatch. Expected %.2f mN·m, got %.2f mN·m\n",
+                   expected_torque_mnm, state.torque_out_mnm);
+            passed = false;
+        }
+
+        // Wheel should start accelerating
+        if (state.omega_rad_s <= 0.0f) {
+            printf("  ERROR: Wheel should be accelerating (omega > 0)\n");
+            passed = false;
+        }
+
+        printf("  current_cmd = 1.0 A\n");
+        printf("  current_out = %.3f A\n", state.current_out_a);
+        printf("  torque_out = %.2f mN·m (expected ~%.2f mN·m)\n", state.torque_out_mnm, expected_torque_mnm);
+        printf("  omega = %.6f rad/s (should be > 0)\n", state.omega_rad_s);
+        printf("  alpha = %.3f rad/s² (acceleration)\n", state.alpha_rad_s2);
+
+        TEST_RESULT("CURRENT mode torque", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // ========================================================================
+    // Test 3: SPEED Mode - Ramp to 1000 RPM
+    // ========================================================================
+    {
+        printf("\n--- Test 3: SPEED Mode (ramp to 1000 RPM) ---\n");
+
+        wheel_model_init(&state);
+        wheel_model_set_mode(&state, CONTROL_MODE_SPEED);
+        wheel_model_set_speed(&state, 1000.0f);  // 1000 RPM
+
+        // Run for 5 seconds (500 ticks at 10 ms)
+        uint32_t ticks = 500;
+        for (uint32_t i = 0; i < ticks; i++) {
+            wheel_model_tick(&state);
+        }
+
+        float final_speed_rpm = wheel_model_get_speed_rpm(&state);
+
+        bool passed = true;
+
+        // Speed should be close to 1000 RPM after 5 seconds
+        float speed_error = fabsf(final_speed_rpm - 1000.0f);
+
+        if (speed_error > 100.0f) {  // 100 RPM tolerance
+            printf("  ERROR: Speed not converged. Expected ~1000 RPM, got %.2f RPM\n", final_speed_rpm);
+            passed = false;
+        }
+
+        printf("  speed_setpoint = 1000.0 RPM\n");
+        printf("  final_speed = %.2f RPM (after 5 seconds)\n", final_speed_rpm);
+        printf("  speed_error = %.2f RPM\n", speed_error);
+        printf("  pi_output = %.3f A\n", state.pi_output_a);
+
+        TEST_RESULT("SPEED mode ramp", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // ========================================================================
+    // Test 4: TORQUE Mode - Commanded Torque to Current
+    // ========================================================================
+    {
+        printf("\n--- Test 4: TORQUE Mode (τ = 10 mN·m) ---\n");
+
+        wheel_model_init(&state);
+        wheel_model_set_mode(&state, CONTROL_MODE_TORQUE);
+        wheel_model_set_torque(&state, 10.0f);  // 10 mN·m
+
+        // Run one tick
+        wheel_model_tick(&state);
+
+        bool passed = true;
+
+        // Expected current: i = τ / k_t = 0.010 N·m / 0.0534 N·m/A ≈ 0.187 A
+        float expected_current_a = 0.010f / MOTOR_KT_NM_PER_A;  // ≈0.187 A
+        float current_error = fabsf(state.current_out_a - expected_current_a);
+
+        if (current_error > 0.01f) {  // 10 mA tolerance
+            printf("  ERROR: Current mismatch. Expected %.3f A, got %.3f A\n",
+                   expected_current_a, state.current_out_a);
+            passed = false;
+        }
+
+        printf("  torque_cmd = 10.0 mN·m\n");
+        printf("  current_out = %.3f A (expected ~%.3f A)\n", state.current_out_a, expected_current_a);
+        printf("  torque_out = %.2f mN·m\n", state.torque_out_mnm);
+
+        TEST_RESULT("TORQUE mode", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // ========================================================================
+    // Test 5: Power Limiting
+    // ========================================================================
+    {
+        printf("\n--- Test 5: Power Limiting (100 W limit) ---\n");
+
+        wheel_model_init(&state);
+        wheel_model_set_mode(&state, CONTROL_MODE_SPEED);
+
+        // Spin up to 3000 RPM first
+        wheel_model_set_speed(&state, 3000.0f);
+        for (uint32_t i = 0; i < 1000; i++) {  // 10 seconds
+            wheel_model_tick(&state);
+        }
+
+        // Now command 6000 RPM (would exceed power limit)
+        wheel_model_set_speed(&state, 6000.0f);
+
+        // Run for a bit
+        for (uint32_t i = 0; i < 100; i++) {  // 1 second
+            wheel_model_tick(&state);
+        }
+
+        bool passed = true;
+
+        // Power should not exceed 100W
+        if (fabsf(state.power_w) > state.motor_overpower_limit_w * 1.1f) {  // 10% tolerance
+            printf("  ERROR: Power exceeded limit. Limit %.2f W, got %.2f W\n",
+                   state.motor_overpower_limit_w, fabsf(state.power_w));
+            passed = false;
+        }
+
+        printf("  power_limit = %.2f W\n", state.motor_overpower_limit_w);
+        printf("  actual_power = %.2f W\n", fabsf(state.power_w));
+        printf("  current_out = %.3f A (limited)\n", state.current_out_a);
+        printf("  speed = %.2f RPM\n", wheel_model_get_speed_rpm(&state));
+
+        TEST_RESULT("Power limiting", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // ========================================================================
+    // Test 6: Loss Model - Deceleration
+    // ========================================================================
+    {
+        printf("\n--- Test 6: Loss Model (spin-down from 3000 RPM) ---\n");
+
+        wheel_model_init(&state);
+        wheel_model_set_mode(&state, CONTROL_MODE_SPEED);
+
+        // Spin up to 3000 RPM
+        wheel_model_set_speed(&state, 3000.0f);
+        for (uint32_t i = 0; i < 1000; i++) {  // 10 seconds
+            wheel_model_tick(&state);
+        }
+
+        float initial_speed = wheel_model_get_speed_rpm(&state);
+
+        // Command zero speed (coast down)
+        wheel_model_set_speed(&state, 0.0f);
+
+        // Run for 5 seconds
+        for (uint32_t i = 0; i < 500; i++) {  // 5 seconds
+            wheel_model_tick(&state);
+        }
+
+        float final_speed = wheel_model_get_speed_rpm(&state);
+
+        bool passed = true;
+
+        // Speed should decrease due to losses
+        if (final_speed >= initial_speed * 0.9f) {  // Should lose at least 10% speed
+            printf("  ERROR: Speed did not decrease enough. Initial %.2f RPM, final %.2f RPM\n",
+                   initial_speed, final_speed);
+            passed = false;
+        }
+
+        printf("  initial_speed = %.2f RPM\n", initial_speed);
+        printf("  final_speed = %.2f RPM (after 5s coast-down)\n", final_speed);
+        printf("  speed_loss = %.2f RPM\n", initial_speed - final_speed);
+        printf("  loss_torque = %.2f mN·m\n", state.torque_loss_mnm);
+
+        TEST_RESULT("Loss model deceleration", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // ========================================================================
+    // Test 7: Overspeed Protection
+    // ========================================================================
+    {
+        printf("\n--- Test 7: Overspeed Protection (6000 RPM fault) ---\n");
+
+        wheel_model_init(&state);
+        wheel_model_set_mode(&state, CONTROL_MODE_SPEED);
+
+        // Try to command overspeed
+        wheel_model_set_speed(&state, 7000.0f);  // Exceeds 6000 RPM fault threshold
+
+        // Run until overspeed or 20 seconds
+        uint32_t max_ticks = 2000;
+        bool fault_triggered = false;
+
+        for (uint32_t i = 0; i < max_ticks; i++) {
+            wheel_model_tick(&state);
+
+            if (state.fault_latch & FAULT_OVERSPEED) {
+                fault_triggered = true;
+                printf("  Overspeed fault triggered at tick %u (%.1f seconds)\n", i, i * MODEL_DT_S);
+                printf("  speed = %.2f RPM\n", wheel_model_get_speed_rpm(&state));
+                break;
+            }
+        }
+
+        bool passed = fault_triggered;
+
+        if (!passed) {
+            printf("  ERROR: Overspeed fault not triggered\n");
+            printf("  Final speed = %.2f RPM\n", wheel_model_get_speed_rpm(&state));
+        }
+
+        printf("  fault_latch = 0x%08X\n", state.fault_latch);
+
+        TEST_RESULT("Overspeed protection", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL WHEEL PHYSICS TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME WHEEL PHYSICS TESTS FAILED ✗✗✗\n");
     }
     printf("\n");
 }

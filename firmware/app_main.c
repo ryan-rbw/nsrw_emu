@@ -29,9 +29,10 @@
 #define CHECKPOINT_4_1  // Ring Buffer stress test
 #define CHECKPOINT_4_2  // Fixed-Point Math accuracy
 #define CHECKPOINT_5_1  // Register Map structure
+#define CHECKPOINT_5_2  // Wheel Physics & Control Modes
 
 // Test mode
-#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1)
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2)
 #include "test_mode.h"
 #endif
 
@@ -228,13 +229,32 @@ int main(void) {
     test_register_map();
     printf("\n");
     printf("--- Checkpoint 5.1 complete ---\n");
+    sleep_ms(1000);  // Brief pause between checkpoints
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // CHECKPOINT 5.2: Wheel Physics & Control Modes Test
+    // ========================================================================
+    #ifdef CHECKPOINT_5_2
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 5.2: WHEEL PHYSICS & CONTROL MODES           ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    printf("NOTE: This test runs physics simulations and may take 30-60 seconds.\n");
+    printf("Tests include spin-up to 3000 RPM and overspeed fault scenarios.\n");
+    printf("\n");
+    test_wheel_physics();
+    printf("\n");
+    printf("--- Checkpoint 5.2 complete ---\n");
     #endif
     // ========================================================================
 
     // ========================================================================
     // ALL CHECKPOINTS COMPLETE - HALT HERE
     // ========================================================================
-    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1)
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2)
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
     printf("║  ALL CHECKPOINT TESTS COMPLETE                            ║\n");

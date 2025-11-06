@@ -134,6 +134,23 @@ void test_fixedpoint_accuracy(void);
  */
 void test_register_map(void);
 
+/**
+ * @brief Test wheel physics model and control modes
+ *
+ * Validates:
+ * - Model initialization
+ * - CURRENT mode (direct torque control)
+ * - SPEED mode (PI controller ramp to 1000 RPM)
+ * - TORQUE mode (feed-forward control)
+ * - Power limiting (100 W enforced)
+ * - Loss model (deceleration)
+ * - Overspeed protection (fault at 6000 RPM)
+ *
+ * Prints results to console.
+ * Enable with: #define CHECKPOINT_5_2
+ */
+void test_wheel_physics(void);
+
 // ============================================================================
 // Helper Macros
 // ============================================================================
