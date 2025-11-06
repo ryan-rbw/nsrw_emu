@@ -26,9 +26,10 @@
 #define CHECKPOINT_3_2  // SLIP codec
 #define CHECKPOINT_3_3  // RS-485 UART loopback
 #define CHECKPOINT_3_4  // NSP Protocol PING responder
+#define CHECKPOINT_4_1  // Ring Buffer stress test
 
 // Test mode
-#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4)
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1)
 #include "test_mode.h"
 #endif
 
@@ -182,12 +183,27 @@ int main(void) {
     // ========================================================================
 
     // ========================================================================
-    // ALL CHECKPOINTS COMPLETE - HALT HERE
+    // CHECKPOINT 4.1: Ring Buffer Stress Test
     // ========================================================================
-    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4)
+    #ifdef CHECKPOINT_4_1
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
-    printf("║  ALL PHASE 3 TESTS COMPLETE                               ║\n");
+    printf("║  CHECKPOINT 4.1: RING BUFFER STRESS TEST                  ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    test_ringbuf_stress();
+    printf("\n");
+    printf("--- Checkpoint 4.1 complete ---\n");
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // ALL CHECKPOINTS COMPLETE - HALT HERE
+    // ========================================================================
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1)
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  ALL CHECKPOINT TESTS COMPLETE                            ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
     printf("System halting. Heartbeat LED will continue blinking.\n");

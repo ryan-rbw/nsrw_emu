@@ -85,12 +85,22 @@ void test_nsp_ping(void);
 
 
 // ============================================================================
-// Phase 4: Utilities Foundation (future checkpoints)
+// Phase 4: Utilities Foundation
 // ============================================================================
 
-#ifdef CHECKPOINT_4_1
+/**
+ * @brief Test ring buffer with stress test
+ *
+ * Validates:
+ * - SPSC ring buffer operations
+ * - FIFO ordering
+ * - Full/empty detection
+ * - 1M operation stress test
+ *
+ * Prints results to console.
+ * Enable with: #define CHECKPOINT_4_1
+ */
 void test_ringbuf_stress(void);
-#endif
 
 #ifdef CHECKPOINT_4_2
 void test_fixedpoint_math(void);

@@ -13,6 +13,7 @@
 #include "slip.h"       // Checkpoint 3.2
 #include "rs485_uart.h" // Checkpoint 3.3
 #include "nsp.h"        // Checkpoint 3.4
+#include "ringbuf.h"    // Checkpoint 4.1
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
@@ -686,6 +687,194 @@ void test_nsp_ping(void) {
         printf("✓✓✓ ALL NSP PING TESTS PASSED ✓✓✓\n");
     } else {
         printf("✗✗✗ SOME NSP TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
+}
+
+// ============================================================================
+// Checkpoint 4.1: Ring Buffer Stress Test
+// ============================================================================
+
+void test_ringbuf_stress(void) {
+    TEST_SECTION("Checkpoint 4.1: Ring Buffer Stress Test");
+
+    bool all_passed = true;
+
+    // Test 1: Initialization
+    printf("Test 1: Initialization\n");
+
+    ringbuf_t rb;
+    bool init_ok = ringbuf_init(&rb, 256);  // Power of 2
+    printf("  Initialize with size 256: %s\n", init_ok ? "OK" : "FAIL");
+
+    // Test invalid sizes
+    ringbuf_t rb_bad;
+    bool bad1 = !ringbuf_init(&rb_bad, 100);  // Not power of 2
+    bool bad2 = !ringbuf_init(&rb_bad, 0);    // Zero
+    bool bad3 = !ringbuf_init(&rb_bad, 512);  // > MAX_SIZE
+
+    bool test1_pass = init_ok && bad1 && bad2 && bad3;
+    printf("  Reject invalid sizes: %s\n", (bad1 && bad2 && bad3) ? "OK" : "FAIL");
+    TEST_RESULT("Test 1 (init)", test1_pass);
+    all_passed &= test1_pass;
+
+    // Test 2: Push/Pop FIFO Order
+    printf("\nTest 2: Push/Pop FIFO Order\n");
+
+    ringbuf_reset(&rb);
+
+    // Push 10 items
+    bool push_ok = true;
+    for (uint32_t i = 0; i < 10; i++) {
+        if (!ringbuf_push(&rb, i + 100)) {
+            push_ok = false;
+            break;
+        }
+    }
+    printf("  Pushed 10 items: %s\n", push_ok ? "OK" : "FAIL");
+
+    // Pop and verify FIFO order
+    bool pop_ok = true;
+    for (uint32_t i = 0; i < 10; i++) {
+        uint32_t value;
+        if (!ringbuf_pop(&rb, &value) || value != (i + 100)) {
+            pop_ok = false;
+            printf("  ERROR: Expected %u, got %u\n", i + 100, value);
+            break;
+        }
+    }
+    printf("  Popped 10 items in order: %s\n", pop_ok ? "OK" : "FAIL");
+
+    bool test2_pass = push_ok && pop_ok;
+    TEST_RESULT("Test 2 (FIFO order)", test2_pass);
+    all_passed &= test2_pass;
+
+    // Test 3: Empty Detection
+    printf("\nTest 3: Empty Detection\n");
+
+    ringbuf_reset(&rb);
+    bool empty1 = ringbuf_is_empty(&rb);
+    printf("  Buffer empty after reset: %s\n", empty1 ? "OK" : "FAIL");
+
+    ringbuf_push(&rb, 42);
+    bool not_empty = !ringbuf_is_empty(&rb);
+    printf("  Buffer not empty after push: %s\n", not_empty ? "OK" : "FAIL");
+
+    uint32_t value;
+    ringbuf_pop(&rb, &value);
+    bool empty2 = ringbuf_is_empty(&rb);
+    printf("  Buffer empty after pop: %s\n", empty2 ? "OK" : "FAIL");
+
+    // Try to pop from empty buffer
+    bool pop_fail = !ringbuf_pop(&rb, &value);
+    printf("  Pop from empty fails: %s\n", pop_fail ? "OK" : "FAIL");
+
+    bool test3_pass = empty1 && not_empty && empty2 && pop_fail;
+    TEST_RESULT("Test 3 (empty detection)", test3_pass);
+    all_passed &= test3_pass;
+
+    // Test 4: Full Detection
+    printf("\nTest 4: Full Detection\n");
+
+    ringbuf_reset(&rb);
+
+    // Fill buffer (255 items max, since we sacrifice one slot)
+    uint32_t filled = 0;
+    while (ringbuf_push(&rb, filled)) {
+        filled++;
+    }
+    printf("  Filled %u items before full\n", filled);
+    printf("  Expected ~255 items (size-1)\n");
+
+    bool is_full = ringbuf_is_full(&rb);
+    printf("  Buffer reports full: %s\n", is_full ? "OK" : "FAIL");
+
+    // Try to push to full buffer
+    bool push_fail = !ringbuf_push(&rb, 999);
+    printf("  Push to full fails: %s\n", push_fail ? "OK" : "FAIL");
+
+    bool test4_pass = (filled >= 254 && filled <= 256) && is_full && push_fail;
+    TEST_RESULT("Test 4 (full detection)", test4_pass);
+    all_passed &= test4_pass;
+
+    // Test 5: Count and Available
+    printf("\nTest 5: Count and Available\n");
+
+    ringbuf_reset(&rb);
+
+    uint32_t count0 = ringbuf_count(&rb);
+    uint32_t avail0 = ringbuf_available(&rb);
+    printf("  Empty: count=%u, available=%u\n", count0, avail0);
+
+    // Push 50 items
+    for (uint32_t i = 0; i < 50; i++) {
+        ringbuf_push(&rb, i);
+    }
+
+    uint32_t count50 = ringbuf_count(&rb);
+    uint32_t avail50 = ringbuf_available(&rb);
+    printf("  After 50 pushes: count=%u, available=%u\n", count50, avail50);
+
+    bool test5_pass = (count0 == 0) && (count50 == 50) && (avail0 > 200) && (avail50 < avail0);
+    TEST_RESULT("Test 5 (count/available)", test5_pass);
+    all_passed &= test5_pass;
+
+    // Test 6: Stress Test (1M operations)
+    printf("\nTest 6: Stress Test (1,000,000 push/pop cycles)\n");
+    printf("  This will take ~3-5 seconds...\n");
+
+    ringbuf_reset(&rb);
+
+    absolute_time_t start = get_absolute_time();
+
+    // Perform 1 million push/pop cycles
+    const uint32_t STRESS_COUNT = 1000000;
+    bool stress_ok = true;
+
+    for (uint32_t i = 0; i < STRESS_COUNT; i++) {
+        // Push value
+        if (!ringbuf_push(&rb, i)) {
+            printf("  ERROR: Push failed at iteration %u\n", i);
+            stress_ok = false;
+            break;
+        }
+
+        // Pop value
+        uint32_t popped;
+        if (!ringbuf_pop(&rb, &popped)) {
+            printf("  ERROR: Pop failed at iteration %u\n", i);
+            stress_ok = false;
+            break;
+        }
+
+        // Verify value
+        if (popped != i) {
+            printf("  ERROR: Data corruption at iteration %u (expected %u, got %u)\n",
+                   i, i, popped);
+            stress_ok = false;
+            break;
+        }
+    }
+
+    absolute_time_t end = get_absolute_time();
+    int64_t elapsed_us = absolute_time_diff_us(start, end);
+    float elapsed_s = elapsed_us / 1000000.0f;
+
+    printf("  Completed %u cycles in %.3f seconds\n", STRESS_COUNT, elapsed_s);
+    printf("  Rate: %.0f ops/sec\n", STRESS_COUNT / elapsed_s);
+    printf("  Average: %.2f µs per push+pop\n", (float)elapsed_us / STRESS_COUNT);
+
+    bool test6_pass = stress_ok && ringbuf_is_empty(&rb);
+    printf("  Buffer empty after test: %s\n", ringbuf_is_empty(&rb) ? "OK" : "FAIL");
+    TEST_RESULT("Test 6 (stress test)", test6_pass);
+    all_passed &= test6_pass;
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL RING BUFFER TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME RING BUFFER TESTS FAILED ✗✗✗\n");
     }
     printf("\n");
 }

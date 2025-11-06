@@ -11,6 +11,8 @@ add_executable(nrwa_t6_emulator
     drivers/slip.c
     drivers/rs485_uart.c
     drivers/nsp.c
+    # Utilities (Phase 4)
+    util/ringbuf.c
     # Test mode
     test_mode.c
 )
