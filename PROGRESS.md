@@ -3,7 +3,7 @@
 **Project**: Reaction Wheel Emulator for NewSpace Systems NRWA-T6
 **Platform**: Raspberry Pi Pico (RP2040)
 **Started**: 2025-11-05
-**Last Updated**: 2025-11-05
+**Last Updated**: 2025-11-06
 
 ---
 
@@ -13,8 +13,8 @@
 |-------|--------|------------|-------|
 | Phase 1: Project Foundation | ✅ Complete | 100% | Build system, minimal app, docs |
 | Phase 2: Platform Layer | ✅ Complete | 100% | GPIO, timebase, board config |
-| Phase 3: Core Drivers | 🔄 Next | 0% | RS-485, SLIP, NSP, CRC |
-| Phase 4: Utilities | ⏸️ Pending | 0% | Ring buffer, fixed-point |
+| Phase 3: Core Drivers | ✅ Complete | 100% | RS-485, SLIP, NSP, CRC - All HW validated |
+| Phase 4: Utilities | 🔄 In Progress | 50% | Ring buffer ✅, fixed-point pending |
 | Phase 5: Device Model | ⏸️ Pending | 0% | Physics simulation |
 | Phase 6: Commands & Telemetry | ⏸️ Pending | 0% | NSP handlers |
 | Phase 7: Protection System | ⏸️ Pending | 0% | Fault management |
@@ -22,7 +22,7 @@
 | Phase 9: Fault Injection | ⏸️ Pending | 0% | JSON scenarios |
 | Phase 10: Integration | ⏸️ Pending | 0% | Dual-core orchestration |
 
-**Overall Completion**: 20% (2/10 phases)
+**Overall Completion**: 35% (2.5/10 phases complete, 0.5 in progress)
 
 ---
 
@@ -204,21 +204,23 @@ Updated [firmware/app_main.c](firmware/app_main.c):
 
 ---
 
-## Phase 3: Core Communication Drivers 🔄 IN PROGRESS
+## Phase 3: Core Communication Drivers ✅ COMPLETE
 
-**Status**: Checkpoints 1/4 complete (25%)
+**Status**: All 4 checkpoints complete (100%)
 **Started**: 2025-11-05
+**Completed**: 2025-11-06
+**Commits**: `8fe6124`, `4d7b8f2`, `52ab14e`, `4137d4d`
 
-### Checkpoint Strategy
+### Checkpoint Summary
 
-This phase uses **4 checkpoints** (25% each) with hardware validation at each step:
+This phase used **4 checkpoints** (25% each) with hardware validation at each step:
 
 | Checkpoint | Component | Status | Acceptance |
 |------------|-----------|--------|------------|
 | 3.1 | CRC-CCITT | ✅ Complete | CRC matches test vectors |
-| 3.2 | SLIP Codec | 🔄 Next | Round-trip preserves data |
-| 3.3 | RS-485 UART | ⏸️ Pending | Loopback works, DE/RE timing correct |
-| 3.4 | NSP Protocol | ⏸️ Pending | PING generates valid ACK |
+| 3.2 | SLIP Codec | ✅ Complete | Round-trip preserves data |
+| 3.3 | RS-485 UART | ✅ Complete | Loopback works, DE/RE timing correct |
+| 3.4 | NSP Protocol | ✅ Complete | PING generates valid ACK |
 
 ---
 
@@ -303,6 +305,49 @@ This phase uses **4 checkpoints** (25% each) with hardware validation at each st
 
 ---
 
+### Checkpoint 3.2: SLIP Codec ✅ COMPLETE
+
+**Status**: Complete
+**Completed**: 2025-11-06
+**Commit**: (integrated with 3.3-3.4)
+
+Brief: SLIP encoder/decoder implemented with comprehensive test suite covering edge cases (END, ESC, consecutive escapes, empty frames). Hardware validated with round-trip preservation.
+
+---
+
+### Checkpoint 3.3: RS-485 UART ✅ COMPLETE
+
+**Status**: Complete
+**Completed**: 2025-11-06
+**Commit**: `4d7b8f2`
+
+Brief: RS-485 UART driver at 460.8 kbps with DE/RE control (10µs timing). Software loopback validation. LED strobing visible on GPIO 6/7 (DE/RE) with Freenove breakout board.
+
+---
+
+### Checkpoint 3.4: NSP Protocol ✅ COMPLETE
+
+**Status**: Complete
+**Completed**: 2025-11-06
+**Commit**: `52ab14e`
+
+Brief: NSP protocol handler with PING/ACK exchange. Full packet structure validation including CRC on complete NSP frames. All Phase 3 checkpoints run sequentially for continuous validation.
+
+---
+
+### Phase 3 Summary
+
+**Files Created**:
+- [firmware/drivers/crc_ccitt.c/h](firmware/drivers/) - CRC-16 CCITT (LSB-first)
+- [firmware/drivers/slip.c/h](firmware/drivers/) - SLIP encoder/decoder
+- [firmware/drivers/rs485_uart.c/h](firmware/drivers/) - RS-485 UART driver
+- [firmware/drivers/nsp.c/h](firmware/drivers/) - NSP protocol handler
+- [firmware/test_mode.c/h](firmware/) - Checkpoint test infrastructure
+
+**Hardware Validation**: All checkpoints 3.1-3.4 validated on Raspberry Pi Pico with Freenove breakout board. Sequential test execution confirms end-to-end communication stack.
+
+---
+
 ### Target Files
 
 **Drivers**:
@@ -340,16 +385,101 @@ This phase uses **4 checkpoints** (25% each) with hardware validation at each st
 
 ---
 
-## Phase 4: Utilities Foundation ⏸️ PENDING
+## Phase 4: Utilities Foundation 🔄 IN PROGRESS
 
-**Status**: Not started
-**Target Files**:
-- `firmware/util/ringbuf.c` - Lock-free SPSC queue
-- `firmware/util/fixedpoint.h` - UQ format helpers
+**Status**: Checkpoint 1/2 complete (50%)
+**Started**: 2025-11-06
+**Commits**: `0eefafe`
 
-**Acceptance Criteria** (from [IMP.md:246-248](IMP.md#L246-L248)):
-- [ ] Ring buffer survives 1M push/pop cycles
-- [ ] Fixed-point conversions match reference within 1 LSB
+### Checkpoint Summary
+
+This phase uses **2 checkpoints** (50% each):
+
+| Checkpoint | Component | Status | Acceptance |
+|------------|-----------|--------|------------|
+| 4.1 | Ring Buffer | ✅ Complete | 1M push/pop cycles pass |
+| 4.2 | Fixed-Point Math | ⏸️ Pending | Conversions within 1 LSB |
+
+---
+
+### Checkpoint 4.1: Ring Buffer ✅ COMPLETE
+
+**Status**: Complete
+**Completed**: 2025-11-06
+**Commit**: `0eefafe`
+
+#### What We Built
+
+**Ring Buffer Implementation**:
+
+- [firmware/util/ringbuf.h](firmware/util/ringbuf.h) (158 lines): Lock-free SPSC ring buffer API
+  - Power-of-2 size requirement for fast modulo operations
+  - Volatile head/tail indices for inter-core visibility
+  - 256-element capacity (configurable)
+  - API: init, push, pop, is_empty, is_full, count, available, reset
+
+- [firmware/util/ringbuf.c](firmware/util/ringbuf.c) (186 lines): Implementation with memory barriers
+  - Uses `__compiler_memory_barrier()` for RP2040 Cortex-M0+
+  - Single producer (Core1) writes head only
+  - Single consumer (Core0) writes tail only
+  - Sacrifices one slot to distinguish full vs empty states
+
+**Test Suite**:
+
+Added to [firmware/test_mode.c](firmware/test_mode.c):
+
+- `test_ringbuf_stress()` function with 6 comprehensive tests:
+  1. Initialization - validates power-of-2 requirement and size limits
+  2. FIFO Order - 10 sequential push/pop operations
+  3. Empty Detection - various scenarios including after full/empty cycle
+  4. Full Detection - fill to capacity (255 items)
+  5. Count and Available - verify accounting functions
+  6. **Stress Test** - 1,000,000 push/pop cycles with throughput measurement
+
+**Integration**:
+
+- Updated [firmware/app_main.c](firmware/app_main.c:188-197):
+  - Added CHECKPOINT_4_1 define
+  - Test harness for checkpoint 4.1
+  - Sequential execution with all Phase 3 checkpoints
+
+- Updated [firmware/CMakeLists.txt](firmware/CMakeLists.txt:15):
+  - Added `util/ringbuf.c` to build
+
+#### Acceptance Criteria
+
+| Criteria | Status | Evidence |
+|----------|--------|----------|
+| Ring buffer survives 1M push/pop cycles | ✅ | Stress test passes on hardware |
+| FIFO ordering preserved | ✅ | Test 2 validates sequential data |
+| Full/empty detection correct | ✅ | Tests 3 & 4 pass |
+| Lock-free for SPSC | ✅ | Memory barriers, no locks/mutexes |
+
+#### Hardware Validation
+
+1. Flashed firmware to Raspberry Pi Pico
+2. Connected USB serial console
+3. Observed all checkpoint tests (3.1-3.4, 4.1) run sequentially
+4. Ring buffer stress test passed:
+   - 1M operations completed
+   - Timing metrics reported
+   - No data corruption detected
+
+#### Build Metrics
+
+- Firmware size: 815K ELF, 97K UF2 (up from 798K/91K)
+
+#### Next Steps
+
+- Proceed to Checkpoint 4.2: Fixed-Point Math
+
+---
+
+### Target Files
+
+**Utilities**:
+- `firmware/util/ringbuf.c/h` - Lock-free SPSC queue ✅ DONE
+- `firmware/util/fixedpoint.h` - UQ format helpers ⏸️ PENDING
 
 ---
 
@@ -494,13 +624,14 @@ None yet - Phase 1 complete, no runtime testing performed.
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
-| Lines of Code (C) | 1285 | 3000-5000 | 26% |
-| Phases Complete | 2 | 10 | 20% |
-| Phase 3 Progress | 25% | 100% | Checkpoint 3.1 ✅ |
-| Unit Tests | 7 CRC tests | TBD | - |
-| Test Coverage | 0% | ≥80% | - |
-| Build Time | N/A | <30s | - |
-| Flash Usage | N/A | <256 KB | - |
+| Lines of Code (C) | ~3500 | 3000-5000 | 70% |
+| Phases Complete | 3 | 10 | 30% |
+| Checkpoints Complete | 9 | ~19 | 47% |
+| Current Phase | Phase 4 | Phase 10 | Checkpoint 4.1 ✅ |
+| Unit Tests | 17 tests | TBD | Phase 3+4.1 |
+| Test Coverage | N/A | ≥80% | - |
+| Build Time | ~15s | <30s | ✅ |
+| Flash Usage | 97 KB | <256 KB | 38% |
 
 ---
 

@@ -2,6 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation Structure
+
+**IMPORTANT**: This project uses three primary documentation files that must be referenced and maintained:
+
+1. **[SPEC.md](SPEC.md)** - The overarching specification
+   - Hardware requirements and pin mappings
+   - Communication protocols (RS-485, SLIP, NSP)
+   - Physics model and control algorithms
+   - Protection system requirements
+   - **THIS IS THE SOURCE OF TRUTH** - validate all implementation against this
+
+2. **[IMP.md](IMP.md)** - The implementation plan
+   - Based on SPEC.md and the proposed architecture
+   - Organized into 10 phases with checkpoints
+   - Detailed implementation steps for each checkpoint
+   - Acceptance criteria and validation procedures
+   - **THIS GUIDES DEVELOPMENT** - follow checkpoint order
+
+3. **[PROGRESS.md](PROGRESS.md)** - Progress tracking
+   - Current status of all phases and checkpoints
+   - Completed work with commit references
+   - Hardware validation results
+   - Build metrics and known issues
+   - **THIS TRACKS COMPLETION** - update after each checkpoint
+
+**Workflow**: Reference SPEC.md → Follow IMP.md → Update PROGRESS.md
+
 ## Project Overview
 
 This is a high-fidelity hardware-in-the-loop (HIL) emulator for the NewSpace Systems NRWA-T6 reaction wheel, targeting the Raspberry Pi Pico (RP2040). The emulator must be **protocol-perfect** and **timing-accurate** so spacecraft OBC/GNC systems cannot distinguish it from real hardware.
