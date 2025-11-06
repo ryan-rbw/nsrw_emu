@@ -102,9 +102,18 @@ void test_nsp_ping(void);
  */
 void test_ringbuf_stress(void);
 
-#ifdef CHECKPOINT_4_2
-void test_fixedpoint_math(void);
-#endif
+/**
+ * @brief Test fixed-point math accuracy
+ *
+ * Validates:
+ * - Float ↔ fixed-point conversions (within 1 LSB)
+ * - Arithmetic operations (add, sub, multiply)
+ * - Saturation behavior
+ *
+ * Prints results to console.
+ * Enable with: #define CHECKPOINT_4_2
+ */
+void test_fixedpoint_accuracy(void);
 
 // ============================================================================
 // Phase 5: Device Model & Physics (future checkpoints)

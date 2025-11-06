@@ -27,9 +27,10 @@
 #define CHECKPOINT_3_3  // RS-485 UART loopback
 #define CHECKPOINT_3_4  // NSP Protocol PING responder
 #define CHECKPOINT_4_1  // Ring Buffer stress test
+#define CHECKPOINT_4_2  // Fixed-Point Math accuracy
 
 // Test mode
-#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1)
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2)
 #include "test_mode.h"
 #endif
 
@@ -194,13 +195,29 @@ int main(void) {
     test_ringbuf_stress();
     printf("\n");
     printf("--- Checkpoint 4.1 complete ---\n");
+    sleep_ms(1000);  // Brief pause between checkpoints
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // CHECKPOINT 4.2: Fixed-Point Math Accuracy Test
+    // ========================================================================
+    #ifdef CHECKPOINT_4_2
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 4.2: FIXED-POINT MATH ACCURACY               ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    test_fixedpoint_accuracy();
+    printf("\n");
+    printf("--- Checkpoint 4.2 complete ---\n");
     #endif
     // ========================================================================
 
     // ========================================================================
     // ALL CHECKPOINTS COMPLETE - HALT HERE
     // ========================================================================
-    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1)
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2)
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
     printf("║  ALL CHECKPOINT TESTS COMPLETE                            ║\n");

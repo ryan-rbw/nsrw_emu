@@ -14,6 +14,7 @@
 #include "rs485_uart.h" // Checkpoint 3.3
 #include "nsp.h"        // Checkpoint 3.4
 #include "ringbuf.h"    // Checkpoint 4.1
+#include "fixedpoint.h" // Checkpoint 4.2
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
@@ -875,6 +876,199 @@ void test_ringbuf_stress(void) {
         printf("✓✓✓ ALL RING BUFFER TESTS PASSED ✓✓✓\n");
     } else {
         printf("✗✗✗ SOME RING BUFFER TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
+}
+
+// ============================================================================
+// Checkpoint 4.2: Fixed-Point Math Accuracy Tests
+// ============================================================================
+
+/**
+ * @brief Test fixed-point conversions and arithmetic
+ *
+ * Validates:
+ * - Float ↔ fixed-point conversions (within 1 LSB)
+ * - Arithmetic operations (add, sub, multiply)
+ * - Saturation behavior
+ */
+void test_fixedpoint_accuracy(void) {
+    TEST_SECTION("Checkpoint 4.2: Fixed-Point Math Accuracy");
+
+    bool all_passed = true;
+
+    // Test 1: UQ14.18 RPM conversions
+    printf("\nTest 1: UQ14.18 Speed (RPM) Conversions\n");
+    bool test1_pass = true;
+
+    float rpm_test_values[] = {0.0f, 3000.0f, 5000.0f, 6000.0f};
+    int rpm_test_count = sizeof(rpm_test_values) / sizeof(rpm_test_values[0]);
+
+    for (int i = 0; i < rpm_test_count; i++) {
+        float original = rpm_test_values[i];
+        uq14_18_t fixed = float_to_uq14_18(original);
+        float recovered = uq14_18_to_float(fixed);
+        float error = fabsf(recovered - original);
+        float tolerance = uq14_18_resolution();  // 1 LSB
+
+        printf("  %.1f RPM → 0x%08X → %.6f RPM (error: %.9f, tol: %.9f)\n",
+               original, fixed, recovered, error, tolerance);
+
+        if (error > tolerance) {
+            test1_pass = false;
+            printf("    ERROR: Exceeds 1 LSB tolerance!\n");
+        }
+    }
+
+    TEST_RESULT("UQ14.18 RPM conversions", test1_pass);
+    all_passed &= test1_pass;
+
+    // Test 2: UQ16.16 Voltage conversions
+    printf("\nTest 2: UQ16.16 Voltage (V) Conversions\n");
+    bool test2_pass = true;
+
+    float voltage_test_values[] = {0.0f, 28.0f, 36.0f};
+    int voltage_test_count = sizeof(voltage_test_values) / sizeof(voltage_test_values[0]);
+
+    for (int i = 0; i < voltage_test_count; i++) {
+        float original = voltage_test_values[i];
+        uq16_16_t fixed = float_to_uq16_16(original);
+        float recovered = uq16_16_to_float(fixed);
+        float error = fabsf(recovered - original);
+        float tolerance = uq16_16_resolution();  // 1 LSB
+
+        printf("  %.1f V → 0x%08X → %.6f V (error: %.9f, tol: %.9f)\n",
+               original, fixed, recovered, error, tolerance);
+
+        if (error > tolerance) {
+            test2_pass = false;
+            printf("    ERROR: Exceeds 1 LSB tolerance!\n");
+        }
+    }
+
+    TEST_RESULT("UQ16.16 Voltage conversions", test2_pass);
+    all_passed &= test2_pass;
+
+    // Test 3: UQ18.14 Torque/Current/Power conversions
+    printf("\nTest 3: UQ18.14 Torque/Current/Power Conversions\n");
+    bool test3_pass = true;
+
+    float uq18_14_test_values[] = {0.0f, 100.0f, 500.0f, 1000.0f};
+    int uq18_14_test_count = sizeof(uq18_14_test_values) / sizeof(uq18_14_test_values[0]);
+
+    for (int i = 0; i < uq18_14_test_count; i++) {
+        float original = uq18_14_test_values[i];
+        uq18_14_t fixed = float_to_uq18_14(original);
+        float recovered = uq18_14_to_float(fixed);
+        float error = fabsf(recovered - original);
+        float tolerance = uq18_14_resolution();  // 1 LSB
+
+        printf("  %.1f mA → 0x%08X → %.6f mA (error: %.9f, tol: %.9f)\n",
+               original, fixed, recovered, error, tolerance);
+
+        if (error > tolerance) {
+            test3_pass = false;
+            printf("    ERROR: Exceeds 1 LSB tolerance!\n");
+        }
+    }
+
+    TEST_RESULT("UQ18.14 conversions", test3_pass);
+    all_passed &= test3_pass;
+
+    // Test 4: Arithmetic - Addition (100mA + 200mA = 300mA)
+    printf("\nTest 4: Arithmetic - Addition\n");
+    bool test4_pass = true;
+
+    uq18_14_t a = float_to_uq18_14(100.0f);
+    uq18_14_t b = float_to_uq18_14(200.0f);
+    uq18_14_t sum = uq18_14_add(a, b);
+    float sum_float = uq18_14_to_float(sum);
+
+    printf("  100.0 mA + 200.0 mA = %.6f mA (expected: 300.0)\n", sum_float);
+
+    float expected_sum = 300.0f;
+    float sum_error = fabsf(sum_float - expected_sum);
+    float sum_tolerance = uq18_14_resolution() * 3.0f;  // Allow 3 LSB accumulation
+
+    if (sum_error > sum_tolerance) {
+        test4_pass = false;
+        printf("    ERROR: Addition error %.6f exceeds tolerance %.6f\n",
+               sum_error, sum_tolerance);
+    }
+
+    TEST_RESULT("Addition (100 + 200 = 300)", test4_pass);
+    all_passed &= test4_pass;
+
+    // Test 5: Saturation - UQ18.14 max value + 1 → saturates
+    printf("\nTest 5: Saturation Behavior\n");
+    bool test5_pass = true;
+
+    uq18_14_t max_val = UQ18_14_MAX;
+    uq18_14_t one = float_to_uq18_14(1.0f);
+    uq18_14_t saturated = uq18_14_add(max_val, one);
+
+    printf("  UQ18_14_MAX (0x%08X) + 1 = 0x%08X\n", max_val, saturated);
+
+    if (saturated != UQ18_14_MAX) {
+        test5_pass = false;
+        printf("    ERROR: Did not saturate to MAX value!\n");
+    } else {
+        printf("    Correctly saturated to UQ18_14_MAX\n");
+    }
+
+    TEST_RESULT("Saturation on overflow", test5_pass);
+    all_passed &= test5_pass;
+
+    // Test 6: Subtraction with underflow protection
+    printf("\nTest 6: Subtraction with Underflow Protection\n");
+    bool test6_pass = true;
+
+    uq18_14_t val_50 = float_to_uq18_14(50.0f);
+    uq18_14_t val_100 = float_to_uq18_14(100.0f);
+    uq18_14_t underflow_result = uq18_14_sub(val_50, val_100);  // 50 - 100 should = 0
+
+    printf("  50.0 mA - 100.0 mA = 0x%08X (expected: 0x00000000)\n", underflow_result);
+
+    if (underflow_result != 0) {
+        test6_pass = false;
+        printf("    ERROR: Did not saturate to zero on underflow!\n");
+    } else {
+        printf("    Correctly saturated to zero\n");
+    }
+
+    TEST_RESULT("Underflow saturation to zero", test6_pass);
+    all_passed &= test6_pass;
+
+    // Test 7: Multiplication
+    printf("\nTest 7: Multiplication\n");
+    bool test7_pass = true;
+
+    uq14_18_t speed_2 = float_to_uq14_18(2.0f);
+    uq14_18_t speed_3 = float_to_uq14_18(3.0f);
+    uq14_18_t product = uq14_18_mul(speed_2, speed_3);
+    float product_float = uq14_18_to_float(product);
+
+    printf("  2.0 * 3.0 = %.6f (expected: 6.0)\n", product_float);
+
+    float expected_product = 6.0f;
+    float product_error = fabsf(product_float - expected_product);
+    float product_tolerance = uq14_18_resolution() * 10.0f;  // Allow 10 LSB for multiply
+
+    if (product_error > product_tolerance) {
+        test7_pass = false;
+        printf("    ERROR: Multiplication error %.6f exceeds tolerance %.6f\n",
+               product_error, product_tolerance);
+    }
+
+    TEST_RESULT("Multiplication (2 * 3 = 6)", test7_pass);
+    all_passed &= test7_pass;
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL FIXED-POINT TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME FIXED-POINT TESTS FAILED ✗✗✗\n");
     }
     printf("\n");
 }
