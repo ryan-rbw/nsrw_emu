@@ -13,6 +13,8 @@ add_executable(nrwa_t6_emulator
     drivers/nsp.c
     # Utilities (Phase 4)
     util/ringbuf.c
+    # Device model (Phase 5)
+    device/nss_nrwa_t6_regs.c
     # Test mode
     test_mode.c
 )

@@ -116,20 +116,23 @@ void test_ringbuf_stress(void);
 void test_fixedpoint_accuracy(void);
 
 // ============================================================================
-// Phase 5: Device Model & Physics (future checkpoints)
+// Phase 5: Device Model & Physics
 // ============================================================================
 
-#ifdef CHECKPOINT_5_1
-void test_physics_init(void);
-#endif
-
-#ifdef CHECKPOINT_5_2
-void test_wheel_spinup(void);
-#endif
-
-#ifdef CHECKPOINT_5_3
-void test_control_modes(void);
-#endif
+/**
+ * @brief Test register map structure and organization
+ *
+ * Validates:
+ * - Register address validity and ranges
+ * - Read-only/read-write access permissions
+ * - Register size detection (1, 2, 4 bytes)
+ * - Register name lookup
+ * - Non-overlapping address spaces
+ *
+ * Prints results to console.
+ * Enable with: #define CHECKPOINT_5_1
+ */
+void test_register_map(void);
 
 // ============================================================================
 // Helper Macros

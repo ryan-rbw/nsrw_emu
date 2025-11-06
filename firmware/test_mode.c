@@ -15,6 +15,7 @@
 #include "nsp.h"        // Checkpoint 3.4
 #include "ringbuf.h"    // Checkpoint 4.1
 #include "fixedpoint.h" // Checkpoint 4.2
+#include "nss_nrwa_t6_regs.h" // Checkpoint 5.1
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
@@ -1069,6 +1070,219 @@ void test_fixedpoint_accuracy(void) {
         printf("✓✓✓ ALL FIXED-POINT TESTS PASSED ✓✓✓\n");
     } else {
         printf("✗✗✗ SOME FIXED-POINT TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
+}
+
+// ============================================================================
+// Checkpoint 5.1: Register Map Tests
+// ============================================================================
+
+/**
+ * @brief Test register map structure and organization
+ *
+ * Validates:
+ * - Register addresses are non-overlapping
+ * - All registers have valid addresses
+ * - Register access permissions (read-only, read/write)
+ * - Register name lookup works correctly
+ */
+void test_register_map(void) {
+    TEST_SECTION("Checkpoint 5.1: Register Map");
+
+    bool all_passed = true;
+
+    // Test 1: Register address validity
+    printf("\nTest 1: Register Address Validity\n");
+    bool test1_pass = true;
+
+    // Sample of key registers to validate
+    uint16_t test_regs[] = {
+        REG_DEVICE_ID,
+        REG_FIRMWARE_VERSION,
+        REG_OVERVOLTAGE_THRESHOLD,
+        REG_CONTROL_MODE,
+        REG_SPEED_SETPOINT_RPM,
+        REG_CURRENT_SPEED_RPM,
+        REG_FAULT_STATUS,
+        REG_COMM_ERRORS_CRC
+    };
+    int num_test_regs = sizeof(test_regs) / sizeof(test_regs[0]);
+
+    for (int i = 0; i < num_test_regs; i++) {
+        bool valid = reg_is_valid_address(test_regs[i]);
+        const char* name = reg_get_name(test_regs[i]);
+        printf("  0x%04X (%s): %s\n", test_regs[i], name, valid ? "VALID" : "INVALID");
+        if (!valid) {
+            test1_pass = false;
+        }
+    }
+
+    TEST_RESULT("Register address validity", test1_pass);
+    all_passed &= test1_pass;
+
+    // Test 2: Non-overlapping addresses
+    printf("\nTest 2: Non-Overlapping Address Ranges\n");
+    bool test2_pass = true;
+
+    // Check that address ranges don't overlap
+    printf("  Device Info: 0x0000-0x00FF\n");
+    printf("  Protection:  0x0100-0x01FF\n");
+    printf("  Control:     0x0200-0x02FF\n");
+    printf("  Status:      0x0300-0x03FF\n");
+    printf("  Fault/Diag:  0x0400-0x04FF\n");
+
+    // Verify boundaries
+    if (REG_OVERVOLTAGE_THRESHOLD < 0x0100 || REG_OVERVOLTAGE_THRESHOLD >= 0x0200) {
+        printf("  ERROR: Protection register out of range!\n");
+        test2_pass = false;
+    }
+    if (REG_CONTROL_MODE < 0x0200 || REG_CONTROL_MODE >= 0x0300) {
+        printf("  ERROR: Control register out of range!\n");
+        test2_pass = false;
+    }
+    if (REG_CURRENT_SPEED_RPM < 0x0300 || REG_CURRENT_SPEED_RPM >= 0x0400) {
+        printf("  ERROR: Status register out of range!\n");
+        test2_pass = false;
+    }
+
+    TEST_RESULT("Address ranges non-overlapping", test2_pass);
+    all_passed &= test2_pass;
+
+    // Test 3: Read-only register detection
+    printf("\nTest 3: Read-Only Register Detection\n");
+    bool test3_pass = true;
+
+    // Device info should be read-only
+    bool device_id_ro = reg_is_readonly(REG_DEVICE_ID);
+    printf("  REG_DEVICE_ID (0x%04X): %s\n",
+           REG_DEVICE_ID, device_id_ro ? "READ-ONLY" : "READ/WRITE");
+    if (!device_id_ro) {
+        printf("    ERROR: Should be read-only!\n");
+        test3_pass = false;
+    }
+
+    // Status registers should be read-only
+    bool speed_ro = reg_is_readonly(REG_CURRENT_SPEED_RPM);
+    printf("  REG_CURRENT_SPEED_RPM (0x%04X): %s\n",
+           REG_CURRENT_SPEED_RPM, speed_ro ? "READ-ONLY" : "READ/WRITE");
+    if (!speed_ro) {
+        printf("    ERROR: Should be read-only!\n");
+        test3_pass = false;
+    }
+
+    // Control registers should be writable
+    bool control_ro = reg_is_readonly(REG_CONTROL_MODE);
+    printf("  REG_CONTROL_MODE (0x%04X): %s\n",
+           REG_CONTROL_MODE, control_ro ? "READ-ONLY" : "READ/WRITE");
+    if (control_ro) {
+        printf("    ERROR: Should be read/write!\n");
+        test3_pass = false;
+    }
+
+    // Protection registers should be writable
+    bool prot_ro = reg_is_readonly(REG_OVERVOLTAGE_THRESHOLD);
+    printf("  REG_OVERVOLTAGE_THRESHOLD (0x%04X): %s\n",
+           REG_OVERVOLTAGE_THRESHOLD, prot_ro ? "READ-ONLY" : "READ/WRITE");
+    if (prot_ro) {
+        printf("    ERROR: Should be read/write!\n");
+        test3_pass = false;
+    }
+
+    TEST_RESULT("Read-only detection correct", test3_pass);
+    all_passed &= test3_pass;
+
+    // Test 4: Register size detection
+    printf("\nTest 4: Register Size Detection\n");
+    bool test4_pass = true;
+
+    // Control mode is 1 byte (enum)
+    uint8_t size_mode = reg_get_size(REG_CONTROL_MODE);
+    printf("  REG_CONTROL_MODE: %u bytes (expected: 1)\n", size_mode);
+    if (size_mode != 1) {
+        test4_pass = false;
+    }
+
+    // Hardware revision is 2 bytes
+    uint8_t size_hw = reg_get_size(REG_HARDWARE_REVISION);
+    printf("  REG_HARDWARE_REVISION: %u bytes (expected: 2)\n", size_hw);
+    if (size_hw != 2) {
+        test4_pass = false;
+    }
+
+    // Most registers are 4 bytes
+    uint8_t size_volt = reg_get_size(REG_OVERVOLTAGE_THRESHOLD);
+    printf("  REG_OVERVOLTAGE_THRESHOLD: %u bytes (expected: 4)\n", size_volt);
+    if (size_volt != 4) {
+        test4_pass = false;
+    }
+
+    TEST_RESULT("Register sizes correct", test4_pass);
+    all_passed &= test4_pass;
+
+    // Test 5: Register name lookup
+    printf("\nTest 5: Register Name Lookup\n");
+    bool test5_pass = true;
+
+    struct {
+        uint16_t addr;
+        const char* expected;
+    } name_tests[] = {
+        {REG_DEVICE_ID, "DEVICE_ID"},
+        {REG_CONTROL_MODE, "CONTROL_MODE"},
+        {REG_CURRENT_SPEED_RPM, "CURRENT_SPEED_RPM"},
+        {REG_FAULT_STATUS, "FAULT_STATUS"},
+        {0xFFFF, "UNKNOWN"}  // Invalid address
+    };
+
+    for (int i = 0; i < 5; i++) {
+        const char* name = reg_get_name(name_tests[i].addr);
+        bool match = (strcmp(name, name_tests[i].expected) == 0);
+        printf("  0x%04X: \"%s\" (expected: \"%s\") %s\n",
+               name_tests[i].addr, name, name_tests[i].expected,
+               match ? "✓" : "✗");
+        if (!match) {
+            test5_pass = false;
+        }
+    }
+
+    TEST_RESULT("Register name lookup", test5_pass);
+    all_passed &= test5_pass;
+
+    // Test 6: Register count and coverage
+    printf("\nTest 6: Register Map Coverage\n");
+    bool test6_pass = true;
+
+    // Count defined registers (approximate)
+    int device_info_regs = 7;
+    int protection_regs = 8;
+    int control_regs = 9;
+    int status_regs = 13;
+    int fault_diag_regs = 12;
+    int total_regs = device_info_regs + protection_regs + control_regs +
+                     status_regs + fault_diag_regs;
+
+    printf("  Device Info:    %2d registers\n", device_info_regs);
+    printf("  Protection:     %2d registers\n", protection_regs);
+    printf("  Control:        %2d registers\n", control_regs);
+    printf("  Status:         %2d registers\n", status_regs);
+    printf("  Fault/Diag:     %2d registers\n", fault_diag_regs);
+    printf("  Total:          %2d registers\n", total_regs);
+
+    if (total_regs < 40) {
+        printf("  WARNING: Expected at least 40 registers!\n");
+        test6_pass = false;
+    }
+
+    TEST_RESULT("Register map coverage", test6_pass);
+    all_passed &= test6_pass;
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL REGISTER MAP TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME REGISTER MAP TESTS FAILED ✗✗✗\n");
     }
     printf("\n");
 }

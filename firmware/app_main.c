@@ -28,9 +28,10 @@
 #define CHECKPOINT_3_4  // NSP Protocol PING responder
 #define CHECKPOINT_4_1  // Ring Buffer stress test
 #define CHECKPOINT_4_2  // Fixed-Point Math accuracy
+#define CHECKPOINT_5_1  // Register Map structure
 
 // Test mode
-#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2)
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1)
 #include "test_mode.h"
 #endif
 
@@ -211,13 +212,29 @@ int main(void) {
     test_fixedpoint_accuracy();
     printf("\n");
     printf("--- Checkpoint 4.2 complete ---\n");
+    sleep_ms(1000);  // Brief pause between checkpoints
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // CHECKPOINT 5.1: Register Map Structure Test
+    // ========================================================================
+    #ifdef CHECKPOINT_5_1
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 5.1: REGISTER MAP STRUCTURE                  ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    test_register_map();
+    printf("\n");
+    printf("--- Checkpoint 5.1 complete ---\n");
     #endif
     // ========================================================================
 
     // ========================================================================
     // ALL CHECKPOINTS COMPLETE - HALT HERE
     // ========================================================================
-    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2)
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1)
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
     printf("║  ALL CHECKPOINT TESTS COMPLETE                            ║\n");
