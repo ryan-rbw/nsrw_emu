@@ -558,7 +558,7 @@ Added to [firmware/test_mode.c](firmware/test_mode.c):
 **Status**: All checkpoints complete (100%)
 **Started**: 2025-11-06
 **Completed**: 2025-11-07
-**Commits**: `654bd9f`, `46e3067`, (checkpoint 5.3 to be committed)
+**Commits**: `654bd9f`, `46e3067`, `3f2e9d3`
 
 ### Checkpoint Summary
 
@@ -771,7 +771,7 @@ Tick 150: Speed = 2950.3 RPM, Current = 0.123 A
 
 **Status**: Complete
 **Completed**: 2025-11-07
-**Commit**: (to be added)
+**Commit**: `3f2e9d3`
 
 #### What We Built
 
