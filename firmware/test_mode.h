@@ -151,6 +151,24 @@ void test_register_map(void);
  */
 void test_wheel_physics(void);
 
+/**
+ * @brief Test hardware reset and LCL fault handling
+ *
+ * Validates per ICD Section 10.2.6 and RESET_FAULT_REQUIREMENTS.md:
+ * - Reset clears LCL trip flag
+ * - Reset preserves momentum (wheel coasts)
+ * - Reset restores default mode/configuration
+ * - LCL trip disables motor immediately
+ * - CLEAR-FAULT does not affect LCL state
+ * - Reset during spin-up operation
+ * - Reset during overspeed fault condition
+ * - Hard faults automatically trip LCL
+ *
+ * Prints results to console.
+ * Enable with: #define CHECKPOINT_5_3
+ */
+void test_reset_and_faults(void);
+
 // ============================================================================
 // Helper Macros
 // ============================================================================

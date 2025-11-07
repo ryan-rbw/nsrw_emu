@@ -189,6 +189,11 @@ nsrw_emu/
 ├── README.md               # This file
 ├── SPEC.md                 # Full specification
 ├── IMP.md                  # Implementation plan
+├── PROGRESS.md             # Development progress tracker
+├── docs/                   # Design baseline documents
+│   ├── README.md           # Documentation guide
+│   ├── NRWA-T6_ICD_v10.02.pdf           # Hardware datasheet (TO BE ADDED)
+│   └── RESET_FAULT_REQUIREMENTS.md      # Reset/fault handling specs
 ├── firmware/               # Embedded firmware
 │   ├── app_main.c          # Main application
 │   ├── platform/           # RP2040 HAL
@@ -258,11 +263,22 @@ This project follows the implementation plan in [IMP.md](IMP.md). Each phase has
 
 *TBD - Specify license here*
 
-## References
+## Documentation
+
+### Key Documents
+
+- **[SPEC.md](SPEC.md)** - High-level emulator specification
+- **[IMP.md](IMP.md)** - Phased implementation plan (10 phases)
+- **[PROGRESS.md](PROGRESS.md)** - Development status and completed work
+- **[docs/](docs/)** - Design baseline and requirements
+  - [NRWA-T6 ICD](docs/NRWA-T6_ICD_v10.02.pdf) - Official hardware datasheet (TO BE ADDED)
+  - [Reset/Fault Requirements](docs/RESET_FAULT_REQUIREMENTS.md) - Reset handling specifications
+
+### External References
 
 - **Pico SDK Documentation**: https://www.raspberrypi.com/documentation/pico-sdk/
 - **RP2040 Datasheet**: https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf
-- **NRWA-T6 ICD**: (Contact NewSpace Systems)
+- **NRWA-T6 ICD**: Version 10.02 (Effective Date: 18 December 2023) - Add to [docs/](docs/) directory
 
 ## Contact
 

@@ -6,6 +6,7 @@
 #include "nss_nrwa_t6_model.h"
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
 
 // ============================================================================
 // Internal Helper Functions
@@ -121,6 +122,13 @@ static void check_protections(wheel_state_t* state) {
     uint32_t new_faults = 0;
     uint32_t new_warnings = 0;
 
+    // If LCL is tripped, motor MUST stay disabled
+    // Only hardware reset can clear this condition
+    if (state->lcl_tripped) {
+        state->current_out_a = 0.0f;
+        return;  // No other protections matter until reset
+    }
+
     // Clear active faults (not latched)
     state->fault_status = 0;
     state->warning_status = 0;
@@ -168,6 +176,14 @@ static void check_protections(wheel_state_t* state) {
 
     // Update warning status
     state->warning_status = new_warnings;
+
+    // Hard faults trip the LCL (requires hardware reset to recover)
+    // Per ICD: Overvoltage and hard overspeed trip LCL
+    if (new_faults & (FAULT_OVERVOLTAGE | FAULT_OVERSPEED)) {
+        state->lcl_tripped = true;
+        printf("[WHEEL] LCL TRIPPED: Hard fault detected (0x%08X)\n", new_faults);
+        // Note: FAULT pin assertion handled by gpio_map layer
+    }
 
     // If any faults are latched, disable motor output
     if (state->fault_latch != 0) {
@@ -404,4 +420,45 @@ void wheel_model_update_pi_params(wheel_state_t* state) {
     // This function would be called when POKE writes to PI tuning registers
     // For now, it's a placeholder for future register integration
     // In Phase 6, this will read from the register map
+}
+
+void wheel_model_reset(wheel_state_t* state) {
+    // Save momentum - wheel doesn't instantly stop on reset
+    // Physics preserved: wheel continues coasting by inertia
+    float omega_saved = state->omega_rad_s;
+    float momentum_saved = state->momentum_nms;
+
+    // Reset to default state (equivalent to power cycle)
+    wheel_model_init(state);
+
+    // Restore momentum - only dynamics preserved, not commands or mode
+    state->omega_rad_s = omega_saved;
+    state->momentum_nms = momentum_saved;
+
+    // Critical: Clear LCL trip flag (only reset can do this)
+    state->lcl_tripped = false;
+
+    // Note: FAULT pin de-assertion handled by gpio_map layer
+    // Console output for debugging
+    printf("[WHEEL] Hardware RESET: LCL cycled, faults cleared, ω=%.1f rad/s\n",
+           omega_saved);
+}
+
+bool wheel_model_is_lcl_tripped(const wheel_state_t* state) {
+    return state->lcl_tripped;
+}
+
+void wheel_model_trip_lcl(wheel_state_t* state) {
+    // Per ICD Section 12.9: TRIP-LCL command [0x0B]
+    // Force trigger LCL protection circuit
+    state->lcl_tripped = true;
+
+    // Set all fault flags (simulates physical fault condition)
+    state->fault_latch = 0xFFFFFFFF;
+
+    // Disable motor output immediately
+    state->current_out_a = 0.0f;
+
+    // Note: FAULT pin assertion handled by gpio_map layer
+    printf("[WHEEL] LCL TRIPPED (test command [0x0B]): Motor disabled, reset required\n");
 }

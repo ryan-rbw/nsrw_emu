@@ -1599,5 +1599,275 @@ void test_wheel_physics(void) {
 }
 
 // ============================================================================
+// Checkpoint 5.3: Reset and Fault Handling Tests
+// ============================================================================
+
+/**
+ * @brief Test hardware reset and LCL fault handling
+ *
+ * Validates reset behavior per ICD Section 10.2.6 and reset requirements doc.
+ *
+ * Test scenarios:
+ * 1. Reset clears LCL trip flag
+ * 2. Reset preserves momentum
+ * 3. Reset restores default mode
+ * 4. LCL trip disables motor
+ * 5. CLEAR-FAULT does not clear LCL
+ * 6. Reset during spin-up
+ * 7. Reset during fault condition
+ * 8. Hard faults trip LCL
+ */
+void test_reset_and_faults(void) {
+    TEST_SECTION("Checkpoint 5.3: Reset and Fault Handling");
+
+    bool all_passed = true;
+
+    // Test 1: Basic reset clears LCL trip
+    {
+        printf("\nTest 1: Reset clears LCL trip flag\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Manually set LCL trip flag
+        wheel_model_trip_lcl(&state);
+        bool tripped_before = wheel_model_is_lcl_tripped(&state);
+
+        // Apply reset
+        wheel_model_reset(&state);
+        bool tripped_after = wheel_model_is_lcl_tripped(&state);
+
+        bool passed = tripped_before && !tripped_after;
+        printf("  LCL tripped before reset: %s\n", tripped_before ? "YES" : "NO");
+        printf("  LCL tripped after reset: %s\n", tripped_after ? "YES" : "NO");
+
+        TEST_RESULT("Reset clears LCL", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 2: Reset preserves momentum
+    {
+        printf("\nTest 2: Reset preserves wheel momentum\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Spin up wheel to 3000 RPM
+        state.omega_rad_s = 3000.0f * RPM_TO_RAD_S;
+        state.momentum_nms = WHEEL_INERTIA_KGM2 * state.omega_rad_s;
+        float speed_before = wheel_model_get_speed_rpm(&state);
+
+        // Apply reset
+        wheel_model_reset(&state);
+        float speed_after = wheel_model_get_speed_rpm(&state);
+
+        // Speed should be preserved (wheel coasts)
+        bool passed = (fabsf(speed_after - speed_before) < 0.1f);
+        printf("  Speed before reset: %.2f RPM\n", speed_before);
+        printf("  Speed after reset: %.2f RPM\n", speed_after);
+
+        TEST_RESULT("Momentum preserved", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 3: Reset restores default mode
+    {
+        printf("\nTest 3: Reset restores default control mode\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Set to SPEED mode with command
+        wheel_model_set_mode(&state, CONTROL_MODE_SPEED);
+        wheel_model_set_speed(&state, 2000.0f);
+        control_mode_t mode_before = state.mode;
+        float speed_cmd_before = state.speed_cmd_rpm;
+
+        // Apply reset (with some momentum)
+        state.omega_rad_s = 1500.0f * RPM_TO_RAD_S;
+        wheel_model_reset(&state);
+
+        control_mode_t mode_after = state.mode;
+        float speed_cmd_after = state.speed_cmd_rpm;
+
+        bool passed = (mode_before == CONTROL_MODE_SPEED) &&
+                      (mode_after == CONTROL_MODE_CURRENT) &&
+                      (speed_cmd_after == 0.0f);
+
+        printf("  Mode before reset: %d (SPEED)\n", mode_before);
+        printf("  Mode after reset: %d (CURRENT=0)\n", mode_after);
+        printf("  Speed cmd before: %.2f RPM\n", speed_cmd_before);
+        printf("  Speed cmd after: %.2f RPM\n", speed_cmd_after);
+
+        TEST_RESULT("Mode reset to default", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 4: LCL trip disables motor immediately
+    {
+        printf("\nTest 4: LCL trip disables motor output\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Set motor current
+        wheel_model_set_current(&state, 2.0f);
+        state.current_out_a = 2.0f;
+        float current_before = state.current_out_a;
+
+        // Trip LCL
+        wheel_model_trip_lcl(&state);
+
+        // Run one tick (should disable motor)
+        wheel_model_tick(&state);
+
+        float current_after = state.current_out_a;
+        bool passed = (current_before > 0.0f) && (current_after == 0.0f);
+
+        printf("  Current before trip: %.2f A\n", current_before);
+        printf("  Current after trip: %.2f A\n", current_after);
+        printf("  LCL tripped: %s\n", wheel_model_is_lcl_tripped(&state) ? "YES" : "NO");
+
+        TEST_RESULT("LCL disables motor", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 5: Clear faults does not clear LCL
+    {
+        printf("\nTest 5: CLEAR-FAULT does not clear LCL trip\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Trip LCL
+        wheel_model_trip_lcl(&state);
+        uint32_t faults_before = state.fault_latch;
+
+        // Clear all fault flags
+        wheel_model_clear_faults(&state, 0xFFFFFFFF);
+        uint32_t faults_after = state.fault_latch;
+
+        // LCL should still be tripped even if fault flags cleared
+        bool lcl_still_tripped = wheel_model_is_lcl_tripped(&state);
+
+        bool passed = (faults_before != 0) &&
+                      (faults_after == 0) &&
+                      lcl_still_tripped;
+
+        printf("  Fault flags before CLEAR-FAULT: 0x%08X\n", faults_before);
+        printf("  Fault flags after CLEAR-FAULT: 0x%08X\n", faults_after);
+        printf("  LCL still tripped: %s\n", lcl_still_tripped ? "YES" : "NO");
+
+        TEST_RESULT("CLEAR-FAULT does not affect LCL", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 6: Reset during spin-up
+    {
+        printf("\nTest 6: Reset during acceleration\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Start acceleration to 4000 RPM
+        wheel_model_set_mode(&state, CONTROL_MODE_SPEED);
+        wheel_model_set_speed(&state, 4000.0f);
+
+        // Simulate partial spin-up
+        state.omega_rad_s = 1200.0f * RPM_TO_RAD_S;
+        state.current_out_a = 2.5f;  // Accelerating
+        float speed_before = wheel_model_get_speed_rpm(&state);
+
+        // Reset mid-acceleration
+        wheel_model_reset(&state);
+
+        float speed_after = wheel_model_get_speed_rpm(&state);
+        float current_after = state.current_out_a;
+        control_mode_t mode_after = state.mode;
+
+        // Speed preserved, current stopped, mode reset
+        bool passed = (fabsf(speed_after - speed_before) < 0.1f) &&
+                      (current_after == 0.0f) &&
+                      (mode_after == CONTROL_MODE_CURRENT);
+
+        printf("  Speed before reset: %.2f RPM\n", speed_before);
+        printf("  Speed after reset: %.2f RPM\n", speed_after);
+        printf("  Current after reset: %.2f A\n", current_after);
+        printf("  Mode after reset: %d (CURRENT)\n", mode_after);
+
+        TEST_RESULT("Reset during spin-up", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 7: Reset during overspeed fault
+    {
+        printf("\nTest 7: Reset during overspeed fault condition\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Force overspeed fault (>6000 RPM)
+        state.omega_rad_s = 6200.0f * RPM_TO_RAD_S;
+        state.momentum_nms = WHEEL_INERTIA_KGM2 * state.omega_rad_s;
+
+        // Run protection check (should trigger overspeed fault)
+        wheel_model_tick(&state);
+
+        bool fault_before = (state.fault_latch != 0);
+        bool lcl_before = wheel_model_is_lcl_tripped(&state);
+
+        // Reset
+        wheel_model_reset(&state);
+
+        bool fault_after = (state.fault_latch == 0);
+        bool lcl_after = !wheel_model_is_lcl_tripped(&state);
+        float speed_after = wheel_model_get_speed_rpm(&state);
+
+        // Faults cleared, LCL cleared, speed preserved
+        bool passed = fault_before && fault_after && lcl_before && lcl_after &&
+                      (speed_after > 6000.0f);  // Still overspeed
+
+        printf("  Fault before reset: 0x%08X\n", fault_before ? 0x00000001 : 0x00000000);
+        printf("  Fault after reset: 0x%08X\n", state.fault_latch);
+        printf("  LCL before reset: %s\n", lcl_before ? "TRIPPED" : "OK");
+        printf("  LCL after reset: %s\n", wheel_model_is_lcl_tripped(&state) ? "TRIPPED" : "OK");
+        printf("  Speed after reset: %.2f RPM (still overspeed)\n", speed_after);
+
+        TEST_RESULT("Reset during fault", passed);
+        if (!passed) all_passed = false;
+
+        // Note: If wheel is still overspeed, next tick will re-trigger fault
+        printf("  Note: If speed >6000 RPM, fault will re-trigger on next tick\n");
+    }
+
+    // Test 8: Hard faults trip LCL
+    {
+        printf("\nTest 8: Hard faults automatically trip LCL\n");
+        wheel_state_t state;
+        wheel_model_init(&state);
+
+        // Simulate overvoltage (hard fault)
+        state.voltage_v = 40.0f;  // >36V threshold
+
+        // Run protection check
+        wheel_model_tick(&state);
+
+        bool lcl_tripped = wheel_model_is_lcl_tripped(&state);
+        uint32_t faults = state.fault_latch;
+
+        bool passed = lcl_tripped && (faults & FAULT_OVERVOLTAGE);
+
+        printf("  Bus voltage: %.2f V (>36V)\n", state.voltage_v);
+        printf("  Fault flags: 0x%08X\n", faults);
+        printf("  LCL tripped: %s\n", lcl_tripped ? "YES" : "NO");
+
+        TEST_RESULT("Hard fault trips LCL", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL RESET AND FAULT TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME RESET AND FAULT TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
+}
+
+// ============================================================================
 // Future Checkpoints
 // ============================================================================

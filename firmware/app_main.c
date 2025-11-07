@@ -30,9 +30,10 @@
 #define CHECKPOINT_4_2  // Fixed-Point Math accuracy
 #define CHECKPOINT_5_1  // Register Map structure
 #define CHECKPOINT_5_2  // Wheel Physics & Control Modes
+#define CHECKPOINT_5_3  // Reset and Fault Handling
 
 // Test mode
-#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2)
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2) || defined(CHECKPOINT_5_3)
 #include "test_mode.h"
 #endif
 
@@ -248,13 +249,32 @@ int main(void) {
     test_wheel_physics();
     printf("\n");
     printf("--- Checkpoint 5.2 complete ---\n");
+    sleep_ms(1000);  // Brief pause between checkpoints
+    #endif
+    // ========================================================================
+
+    // ========================================================================
+    // CHECKPOINT 5.3: Reset and Fault Handling Test
+    // ========================================================================
+    #ifdef CHECKPOINT_5_3
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 5.3: RESET AND FAULT HANDLING                 ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    printf("NOTE: This test validates hardware reset behavior and LCL trip handling.\n");
+    printf("Tests cover reset during various operational states and fault conditions.\n");
+    printf("\n");
+    test_reset_and_faults();
+    printf("\n");
+    printf("--- Checkpoint 5.3 complete ---\n");
     #endif
     // ========================================================================
 
     // ========================================================================
     // ALL CHECKPOINTS COMPLETE - HALT HERE
     // ========================================================================
-    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2)
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2) || defined(CHECKPOINT_5_3)
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
     printf("║  ALL CHECKPOINT TESTS COMPLETE                            ║\n");

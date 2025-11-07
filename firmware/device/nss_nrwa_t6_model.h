@@ -115,6 +115,9 @@ typedef struct {
     uint32_t fault_latch;
     uint32_t warning_status;
 
+    // LCL (Latching Current Limiter) state
+    bool lcl_tripped;           // LCL trip flag (cleared only by hardware reset)
+
     // Statistics
     uint32_t tick_count;        // Total physics ticks
     uint32_t uptime_seconds;    // Total uptime
@@ -214,6 +217,44 @@ void wheel_model_update_protections(wheel_state_t* state);
  * @param state Pointer to wheel state structure
  */
 void wheel_model_update_pi_params(wheel_state_t* state);
+
+/**
+ * @brief Handle hardware reset
+ *
+ * Per ICD Section 10.2.6: "The RESET signal is pulled low to reset the
+ * internal LCL circuit, cycling and restoring power to the internal WDE
+ * [+1.5V, +3.3V, +5V, +12V] supply rails."
+ *
+ * Reset behavior:
+ * - Clears LCL trip condition
+ * - Clears all fault flags
+ * - Resets to default configuration
+ * - Preserves momentum (wheel continues coasting by physics)
+ *
+ * @param state Pointer to wheel state structure
+ */
+void wheel_model_reset(wheel_state_t* state);
+
+/**
+ * @brief Check if LCL is tripped
+ *
+ * LCL trip requires hardware reset to clear. CLEAR-FAULT command [0x09]
+ * does not affect LCL state.
+ *
+ * @param state Pointer to wheel state structure
+ * @return true if LCL is tripped (motor disabled, requires reset)
+ */
+bool wheel_model_is_lcl_tripped(const wheel_state_t* state);
+
+/**
+ * @brief Force trigger LCL (for TRIP-LCL command [0x0B])
+ *
+ * Per ICD Section 12.9: Test command to simulate LCL trip condition.
+ * Requires hardware reset to recover.
+ *
+ * @param state Pointer to wheel state structure
+ */
+void wheel_model_trip_lcl(wheel_state_t* state);
 
 // ============================================================================
 // Utility Functions

@@ -1,0 +1,22 @@
+The NRWA-T6 ICD datasheet should be placed here:
+
+Filename: NRWA-T6_ICD_v10.02.pdf
+Version: 10.02
+Effective Date: 18 December 2023
+Pages: 57
+
+This file will serve as the design baseline for the emulator implementation.
+
+To add the datasheet:
+1. Copy the PDF file to this directory (docs/)
+2. Rename to: NRWA-T6_ICD_v10.02.pdf
+3. Calculate SHA256 checksum: sha256sum NRWA-T6_ICD_v10.02.pdf
+4. Update docs/README.md with checksum and commit hash
+5. Commit to repository
+
+The datasheet is referenced in:
+- docs/README.md
+- docs/RESET_FAULT_REQUIREMENTS.md
+- README.md (main project README)
+
+Status: PENDING USER ACTION
