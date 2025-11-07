@@ -169,6 +169,24 @@ void test_wheel_physics(void);
  */
 void test_reset_and_faults(void);
 
+/**
+ * @brief Test NSP command handlers
+ *
+ * Validates all 8 NSP commands:
+ * - PING [0x00]
+ * - PEEK [0x02] (register read)
+ * - POKE [0x03] (register write)
+ * - APPLICATION-TELEMETRY [0x07]
+ * - APPLICATION-COMMAND [0x08]
+ * - CLEAR-FAULT [0x09]
+ * - CONFIGURE-PROTECTION [0x0A]
+ * - TRIP-LCL [0x0B]
+ *
+ * Prints results to console.
+ * Enable with: #define CHECKPOINT_6_1
+ */
+void test_nsp_commands(void);
+
 // ============================================================================
 // Helper Macros
 // ============================================================================

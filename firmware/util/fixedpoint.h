@@ -36,9 +36,19 @@ typedef uint32_t uq16_16_t;
 /** @brief UQ18.14: 18 integer bits, 14 fractional bits (for torque, current, power) */
 typedef uint32_t uq18_14_t;
 
+/** @brief UQ8.8: 8 integer bits, 8 fractional bits (for temperatures) */
+typedef uint16_t uq8_8_t;
+
 // ============================================================================
 // Format Constants
 // ============================================================================
+
+// UQ8.8 (Temperature)
+#define UQ8_8_FRAC_BITS     8
+#define UQ8_8_INT_BITS      8
+#define UQ8_8_ONE           (1U << UQ8_8_FRAC_BITS)    // 256
+#define UQ8_8_MAX           UINT16_MAX                  // Full 16-bit range
+#define UQ8_8_MAX_INT       ((1U << UQ8_8_INT_BITS) - 1)  // 255
 
 // UQ14.18 (Speed)
 #define UQ14_18_FRAC_BITS   18
@@ -64,6 +74,32 @@ typedef uint32_t uq18_14_t;
 // ============================================================================
 // Conversion Functions: Float ↔ Fixed-Point
 // ============================================================================
+
+/**
+ * @brief Convert float to UQ8.8 (Temperature in °C)
+ *
+ * @param f Float value (0.0 to 255.99609375)
+ * @return Fixed-point value, saturated to UQ8_8_MAX
+ */
+static inline uq8_8_t float_to_uq8_8(float f) {
+    if (f <= 0.0f) {
+        return 0;
+    }
+    if (f >= (float)UQ8_8_MAX_INT) {
+        return UQ8_8_MAX;  // Saturate
+    }
+    return (uq8_8_t)(f * (float)UQ8_8_ONE + 0.5f);  // Round to nearest
+}
+
+/**
+ * @brief Convert UQ8.8 to float
+ *
+ * @param x Fixed-point value
+ * @return Float value
+ */
+static inline float uq8_8_to_float(uq8_8_t x) {
+    return (float)x / (float)UQ8_8_ONE;
+}
 
 /**
  * @brief Convert float to UQ14.18 (Speed in RPM)

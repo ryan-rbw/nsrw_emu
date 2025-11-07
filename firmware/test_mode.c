@@ -17,6 +17,8 @@
 #include "fixedpoint.h" // Checkpoint 4.2
 #include "nss_nrwa_t6_regs.h" // Checkpoint 5.1
 #include "nss_nrwa_t6_model.h" // Checkpoint 5.2
+#include "nss_nrwa_t6_commands.h" // Checkpoint 6.1
+#include "nss_nrwa_t6_telemetry.h" // Checkpoint 6.1
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
@@ -1864,6 +1866,206 @@ void test_reset_and_faults(void) {
         printf("✓✓✓ ALL RESET AND FAULT TESTS PASSED ✓✓✓\n");
     } else {
         printf("✗✗✗ SOME RESET AND FAULT TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
+}
+
+// ============================================================================
+// Phase 6: Device Commands & Telemetry
+// ============================================================================
+
+/**
+ * @brief Test NSP command handlers
+ *
+ * Validates all 8 NSP commands:
+ * - PING, PEEK, POKE, APPLICATION-TELEMETRY, APPLICATION-COMMAND,
+ *   CLEAR-FAULT, CONFIGURE-PROTECTION, TRIP-LCL
+ */
+void test_nsp_commands(void) {
+    TEST_SECTION("Checkpoint 6.1: NSP Command Handlers");
+
+    // Initialize wheel state
+    wheel_state_t state;
+    wheel_model_init(&state);
+
+    // Initialize command handler
+    commands_init(&state);
+
+    bool all_passed = true;
+    cmd_result_t result;
+
+    // Test 1: PING command
+    {
+        TEST_SECTION("Test 1: PING Command");
+        printf("Testing PING [0x00] command...\n");
+
+        uint8_t payload[] = {};
+        cmd_ping(payload, 0, &result);
+
+        bool passed = (result.status == CMD_ACK) && (result.data_len == 0);
+        printf("  Response: %s\n", (result.status == CMD_ACK) ? "ACK" : "NACK");
+
+        TEST_RESULT("PING returns ACK", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 2: PEEK register (read STATUS register)
+    {
+        TEST_SECTION("Test 2: PEEK Register");
+        printf("Testing PEEK [0x02] command (read STATUS register)...\n");
+
+        uint8_t payload[] = {0x00, 0x00, 0x01};  // Address 0x0000, count 1
+        cmd_peek(payload, 3, &result);
+
+        bool passed = (result.status == CMD_ACK) && (result.data_len == 4);
+        printf("  Response: %s, data_len=%u\n",
+               (result.status == CMD_ACK) ? "ACK" : "NACK", result.data_len);
+
+        if (result.data && result.data_len == 4) {
+            uint32_t status = (result.data[0] << 24) | (result.data[1] << 16) |
+                               (result.data[2] << 8) | result.data[3];
+            printf("  Status value: 0x%08X\n", status);
+        }
+
+        TEST_RESULT("PEEK returns register data", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 3: POKE register (set control mode to SPEED)
+    {
+        TEST_SECTION("Test 3: POKE Register");
+        printf("Testing POKE [0x03] command (set control mode to SPEED)...\n");
+
+        uint8_t payload[] = {
+            0x02, 0x00,           // Address REG_CONTROL_MODE (0x0200) - BIG ENDIAN!
+            0x01,                 // Count 1
+            CONTROL_MODE_SPEED, 0x00, 0x00, 0x00  // Value: SPEED mode (1) - LITTLE ENDIAN!
+        };
+        cmd_poke(payload, 7, &result);
+
+        bool passed = (result.status == CMD_ACK) && (state.mode == CONTROL_MODE_SPEED);
+        printf("  Response: %s\n", (result.status == CMD_ACK) ? "ACK" : "NACK");
+        printf("  Mode after POKE: %u (expected %u)\n", state.mode, CONTROL_MODE_SPEED);
+
+        TEST_RESULT("POKE sets control mode", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 4: APPLICATION-COMMAND (set speed to 1000 RPM)
+    {
+        TEST_SECTION("Test 4: APPLICATION-COMMAND (Set Speed)");
+        printf("Testing APPLICATION-COMMAND [0x08] - Set Speed to 1000 RPM...\n");
+
+        uint32_t speed_uq = float_to_uq14_18(1000.0f);
+        uint8_t payload[] = {
+            0x01,  // Subcommand: SET-SPEED
+            (speed_uq >> 24) & 0xFF,
+            (speed_uq >> 16) & 0xFF,
+            (speed_uq >> 8) & 0xFF,
+            speed_uq & 0xFF
+        };
+        cmd_application_command(payload, 5, &result);
+
+        bool passed = (result.status == CMD_ACK) &&
+                       (fabsf(state.speed_cmd_rpm - 1000.0f) < 1.0f);
+        printf("  Response: %s\n", (result.status == CMD_ACK) ? "ACK" : "NACK");
+        printf("  Speed setpoint: %.1f RPM (expected 1000.0 RPM)\n", state.speed_cmd_rpm);
+
+        TEST_RESULT("APPLICATION-COMMAND sets speed", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 5: CLEAR-FAULT
+    {
+        TEST_SECTION("Test 5: CLEAR-FAULT");
+        printf("Testing CLEAR-FAULT [0x09] command...\n");
+
+        // Inject a fault first
+        state.fault_latch = FAULT_OVERPOWER;
+
+        uint8_t payload[] = {0xFF, 0xFF, 0xFF, 0xFF};  // Clear all faults
+        cmd_clear_fault(payload, 4, &result);
+
+        bool passed = (result.status == CMD_ACK) && (state.fault_latch == 0);
+        printf("  Response: %s\n", (result.status == CMD_ACK) ? "ACK" : "NACK");
+        printf("  Fault latch after clear: 0x%08X (expected 0)\n", state.fault_latch);
+
+        TEST_RESULT("CLEAR-FAULT clears faults", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 6: CONFIGURE-PROTECTION (set overspeed fault threshold)
+    {
+        TEST_SECTION("Test 6: CONFIGURE-PROTECTION");
+        printf("Testing CONFIGURE-PROTECTION [0x0A] - Set overspeed to 5500 RPM...\n");
+
+        uint32_t overspeed_uq = float_to_uq14_18(5500.0f);
+        uint8_t payload[] = {
+            0x01,  // Param ID: Overspeed fault
+            (overspeed_uq >> 24) & 0xFF,
+            (overspeed_uq >> 16) & 0xFF,
+            (overspeed_uq >> 8) & 0xFF,
+            overspeed_uq & 0xFF
+        };
+        cmd_configure_protection(payload, 5, &result);
+
+        bool passed = (result.status == CMD_ACK) &&
+                       (fabsf(state.overspeed_fault_rpm - 5500.0f) < 1.0f);
+        printf("  Response: %s\n", (result.status == CMD_ACK) ? "ACK" : "NACK");
+        printf("  Overspeed threshold: %.1f RPM (expected 5500.0 RPM)\n", state.overspeed_fault_rpm);
+
+        TEST_RESULT("CONFIGURE-PROTECTION updates threshold", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 7: TRIP-LCL
+    {
+        TEST_SECTION("Test 7: TRIP-LCL");
+        printf("Testing TRIP-LCL [0x0B] command...\n");
+
+        uint8_t payload[] = {};
+        cmd_trip_lcl(payload, 0, &result);
+
+        bool lcl_tripped = wheel_model_is_lcl_tripped(&state);
+        bool passed = (result.status == CMD_ACK) && lcl_tripped;
+        printf("  Response: %s\n", (result.status == CMD_ACK) ? "ACK" : "NACK");
+        printf("  LCL tripped: %s\n", lcl_tripped ? "YES" : "NO");
+
+        TEST_RESULT("TRIP-LCL trips LCL", passed);
+        if (!passed) all_passed = false;
+
+        // Reset for next test
+        wheel_model_reset(&state);
+    }
+
+    // Test 8: APPLICATION-TELEMETRY (request STANDARD block)
+    {
+        TEST_SECTION("Test 8: APPLICATION-TELEMETRY (STANDARD block)");
+        printf("Testing APPLICATION-TELEMETRY [0x07] - STANDARD block...\n");
+
+        // Set some state for telemetry
+        wheel_model_set_speed(&state, 2000.0f);
+        for (int i = 0; i < 50; i++) {
+            wheel_model_tick(&state);  // Let it spin up a bit
+        }
+
+        uint8_t payload[] = {TELEM_BLOCK_STANDARD};
+        cmd_application_telemetry(payload, 1, &result);
+
+        bool passed = (result.status == CMD_ACK) && (result.data_len == 38);
+        printf("  Response: %s, data_len=%u (expected 38)\n",
+               (result.status == CMD_ACK) ? "ACK" : "NACK", result.data_len);
+
+        TEST_RESULT("APPLICATION-TELEMETRY returns block", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL NSP COMMAND TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME NSP COMMAND TESTS FAILED ✗✗✗\n");
     }
     printf("\n");
 }
