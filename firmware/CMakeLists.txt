@@ -27,7 +27,15 @@ add_executable(nrwa_t6_emulator
     # Console & TUI (Phase 8)
     console/tui.c
     console/tables.c
+    console/commands.c
     console/table_tests.c
+    console/table_serial.c
+    console/table_nsp.c
+    console/table_control.c
+    console/table_dynamics.c
+    console/table_protections.c
+    console/table_telemetry.c
+    console/table_config.c
 )
 
 # Pass version string as compile definition

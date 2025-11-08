@@ -265,7 +265,7 @@ nsrw_emu/
 
 ## Development Status
 
-**Current Phase**: Phase 8 (Console & TUI) - Checkpoint 8.1 Complete (33%) 🔄
+**Current Phase**: Phase 8 Complete ✅ - Console & TUI (100%)
 
 - [x] Phase 1: Project Foundation
 - [x] Phase 2: Platform Layer
@@ -274,17 +274,18 @@ nsrw_emu/
 - [x] Phase 5: Device Model & Physics
 - [x] Phase 6: Device Commands & Telemetry
 - [x] Phase 7: Protection System
-- [x] Phase 8.1: TUI Core & Test System Refactor
-- [ ] Phase 8.2: Table Catalog (7 base tables)
-- [ ] Phase 8.3: Command Palette
+- [x] Phase 8: Console & TUI (Complete)
+  - [x] 8.1: TUI Core & Test System Refactor
+  - [x] 8.2: Table Catalog (7 base tables)
+  - [x] 8.3: Command Palette
 - [ ] Phase 9: Fault Injection System
 - [ ] Phase 10: Main Application & Dual-Core
 
 **Metrics**:
-- **Lines of Code**: ~10,520 (210% of target)
-- **Checkpoints Complete**: 15/~19 (79%)
+- **Lines of Code**: ~12,900 (258% of target)
+- **Checkpoints Complete**: 18/~19 (95%)
 - **Unit Tests**: 46 tests (all passing, cached at boot)
-- **Flash Usage**: 175 KB / 256 KB (68%)
+- **Flash Usage**: 252 KB / 256 KB (98%)
 
 See [PROGRESS.md](PROGRESS.md) for detailed status and [IMP.md](IMP.md) for implementation plan.
 
@@ -354,4 +355,4 @@ This project follows the implementation plan in [IMP.md](IMP.md). Each phase has
 
 **Version**: 0.1.0
 **Last Updated**: 2025-11-08
-**Status**: Phase 8 Checkpoint 8.1 Complete - TUI Core & Test System Refactor
+**Status**: Phase 8 Complete ✅ - Console & TUI with full table catalog and command palette

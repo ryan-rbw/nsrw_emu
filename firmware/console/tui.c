@@ -9,6 +9,7 @@
 #include "tui.h"
 #include "tables.h"
 #include "test_results.h"
+#include "commands.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -195,10 +196,27 @@ static bool tui_handle_browse_input(int key) {
 
         case '\r':
         case '\n':
-            // Enter: Edit selected field (TODO: Checkpoint 8.3)
-            snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
-                     "Field editing not implemented yet (Checkpoint 8.3)");
-            g_tui_state.needs_refresh = true;
+            // Enter: Edit selected field
+            if (g_tui_state.table_expanded[g_tui_state.selected_table_idx]) {
+                // Get selected field
+                const table_meta_t* table = catalog_get_table_by_index(g_tui_state.selected_table_idx);
+                if (table && g_tui_state.selected_field_idx < table->field_count) {
+                    const field_meta_t* field = catalog_get_field(table, g_tui_state.selected_field_idx);
+
+                    if (field && field->access != FIELD_ACCESS_RO) {
+                        // Use command mode for editing (easier than inline editing)
+                        snprintf(g_tui_state.input_buf, sizeof(g_tui_state.input_buf),
+                                 "d t s %s.%s ", table->name, field->name);
+                        g_tui_state.input_len = strlen(g_tui_state.input_buf);
+                        g_tui_state.mode = TUI_MODE_COMMAND;
+                        g_tui_state.needs_refresh = true;
+                    } else {
+                        snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                 "Field is read-only");
+                        g_tui_state.needs_refresh = true;
+                    }
+                }
+            }
             return true;
 
         case 'c':
@@ -237,9 +255,28 @@ static bool tui_handle_command_input(int key) {
 
         case '\r':
         case '\n':
-            // Execute command (TODO: Checkpoint 8.3 - command parser)
-            snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
-                     "Command execution not implemented yet (Checkpoint 8.3)");
+            // Execute command
+            {
+                char output[512];
+                cmd_result_t result = cmd_execute(g_tui_state.input_buf, output, sizeof(output));
+
+                // Copy first line of output to status message
+                char* newline = strchr(output, '\n');
+                if (newline) {
+                    *newline = '\0';  // Truncate at first newline
+                }
+                strncpy(g_tui_state.status_msg, output, sizeof(g_tui_state.status_msg) - 1);
+                g_tui_state.status_msg[sizeof(g_tui_state.status_msg) - 1] = '\0';
+
+                // For multi-line output, print to console before returning to browse mode
+                if (strchr(output, '\0') + 1 < output + strlen(output)) {
+                    printf("%s\n", output);
+                    printf("\nPress any key to continue...");
+                    while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) {
+                        sleep_ms(10);
+                    }
+                }
+            }
             g_tui_state.mode = TUI_MODE_BROWSE;
             g_tui_state.needs_refresh = true;
             return true;
@@ -346,23 +383,30 @@ void tui_render_command_palette(void) {
     // Header
     tui_print_header();
 
-    // Command prompt
+    // Command prompt with visible cursor
     printf("\n");
     printf(ANSI_BOLD "Command Palette" ANSI_RESET "\n");
     printf("\n");
-    printf(ANSI_FG_GREEN "> " ANSI_RESET "%s" ANSI_CURSOR_SHOW, g_tui_state.input_buf);
+    printf(ANSI_FG_GREEN "> " ANSI_RESET "%s█", g_tui_state.input_buf);
 
-    // Hints
+    // Show available tables
     printf("\n\n");
-    printf(ANSI_DIM "Available commands:" ANSI_RESET "\n");
-    printf(ANSI_DIM "  help, ?           - Show help" ANSI_RESET "\n");
-    printf(ANSI_DIM "  database (db, d)  - Database commands" ANSI_RESET "\n");
-    printf(ANSI_DIM "    table (t, tab)  - Table operations" ANSI_RESET "\n");
-    printf(ANSI_DIM "      list (ls, l)  - List all tables" ANSI_RESET "\n");
-    printf(ANSI_DIM "      get <t>.<f>   - Get field value" ANSI_RESET "\n");
-    printf(ANSI_DIM "      set <t>.<f> <val> - Set field" ANSI_RESET "\n");
-    printf(ANSI_DIM "    defaults (def)  - Show non-defaults" ANSI_RESET "\n");
-    printf(ANSI_DIM "  quit (q)          - Exit" ANSI_RESET "\n");
+    printf(ANSI_DIM "Available Tables:" ANSI_RESET "\n");
+    uint8_t table_count = catalog_get_table_count();
+    for (uint8_t i = 0; i < table_count && i < 8; i++) {
+        const table_meta_t* table = catalog_get_table_by_index(i);
+        if (table) {
+            printf(ANSI_DIM "  %d. %-20s (%d fields)" ANSI_RESET "\n",
+                   table->id, table->name, table->field_count);
+        }
+    }
+
+    // Quick command hints
+    printf("\n");
+    printf(ANSI_DIM "Quick commands:" ANSI_RESET "\n");
+    printf(ANSI_DIM "  d t g <table>.<field>       - Get field value" ANSI_RESET "\n");
+    printf(ANSI_DIM "  d t s <table>.<field> <val> - Set field value" ANSI_RESET "\n");
+    printf(ANSI_DIM "  help, ?                     - Show all commands" ANSI_RESET "\n");
     printf("\n");
     printf(ANSI_DIM "ESC: Cancel | ENTER: Execute" ANSI_RESET "\n");
 

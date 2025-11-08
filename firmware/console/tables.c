@@ -8,6 +8,13 @@
 
 #include "tables.h"
 #include "table_tests.h"
+#include "table_serial.h"
+#include "table_nsp.h"
+#include "table_control.h"
+#include "table_dynamics.h"
+#include "table_protections.h"
+#include "table_telemetry.h"
+#include "table_config.h"
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -31,15 +38,13 @@ void catalog_init(void) {
 
     // Register tables (in menu order)
     table_tests_init();
-
-    // TODO: Checkpoint 8.2 will add remaining 6 tables
-    // - Serial Interface
-    // - NSP Layer
-    // - Control Mode
-    // - Dynamics
-    // - Protections
-    // - Telemetry Blocks
-    // - Config & JSON
+    table_serial_init();
+    table_nsp_init();
+    table_control_init();
+    table_dynamics_init();
+    table_protections_init();
+    table_telemetry_init();
+    table_config_init();
 
     printf("[CATALOG] Initialized with %d tables\n", catalog_count);
 }
