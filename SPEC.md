@@ -131,16 +131,53 @@ Blocks: STANDARD, TEMPERATURES, VOLTAGES, CURRENTS, DIAGNOSTICS; sizes and field
 
 ## 8. Console TUI (USB‑CDC)
 
-Interactive menu with Tables and Fields. Input accepts numbers to navigate; `q` back, `r` refresh, `e` edit. A command palette is also provided (see §8A).
+**Non-scrolling, live-updating interface** (like `top`/`htop`) with arrow-key navigation and expand/collapse tables.
 
-**Tables**
-1. Serial Interface — status, tx/rx counts, errors, baud, port, SLIP, CRC
-2. NSP Layer — last cmd/reply, poll, ack, command stats, timing
-3. Control Mode — active mode, setpoint, direction, PWM, source
-4. Dynamics — speed, momentum, torque, current, power, losses, α
-5. Protections — thresholds, power limit, flags, clear faults
-6. Telemetry Blocks — decoded STANDARD/TEMP/VOLT/CURR/DIAG
-7. Config & JSON — scenarios, defaults, save/restore
+### 8.1 Screen Layout
+
+```text
+┌─ NRWA-T6 Emulator ──── Uptime: 00:15:32 ──── Tests: 78/78 ✓ ─────┐
+├─ Status: ON │ Mode: SPEED │ RPM: 3245 │ Current: 1.25A │ Fault: -┤
+├───────────────────────────────────────────────────────────────────┤
+│ TABLES                                                            │
+│                                                                   │
+│ > 1. ▶ Built-In Tests      [COLLAPSED]                           │
+│   2. ▶ Serial Interface    [COLLAPSED]                           │
+│   3. ▼ Control Mode        [EXPANDED]                            │
+│       ├─ mode          : SPEED       (RW)                         │
+│     ► ├─ setpoint_rpm  : 3000        (RW)    ← cursor here       │
+│       ├─ actual_rpm    : 3245        (RO)                         │
+│       └─ pid_enabled   : true        (RW)                         │
+│   4. ▶ Dynamics            [COLLAPSED]                            │
+│   5. ▶ Protections         [COLLAPSED]                            │
+│   6. ▶ Telemetry Blocks    [COLLAPSED]                            │
+│   7. ▶ Config & JSON       [COLLAPSED]                            │
+│                                                                   │
+├───────────────────────────────────────────────────────────────────┤
+│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Enter: Edit │ C: Command│
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### 8.2 Navigation
+
+- **↑/↓** — Move cursor between tables/fields
+- **→** — Expand selected table (show fields)
+- **←** — Collapse expanded table
+- **Enter** — Edit selected field (prompts for new value)
+- **C** — Enter command mode (see §8A)
+- **R** — Force screen refresh
+- **Q** or **ESC** — Quit TUI
+
+### 8.3 Tables
+
+1. **Built-In Tests** — Boot-time checkpoint test results (total, passed, failed, duration)
+2. **Serial Interface** — Status, tx/rx counts, errors, baud, port, SLIP, CRC
+3. **NSP Layer** — Last cmd/reply, poll, ack, command stats, timing
+4. **Control Mode** — Active mode, setpoint, direction, PWM, source
+5. **Dynamics** — Speed, momentum, torque, current, power, losses, α
+6. **Protections** — Thresholds, power limit, flags, clear faults
+7. **Telemetry Blocks** — Decoded STANDARD/TEMP/VOLT/CURR/DIAG
+8. **Config & JSON** — Scenarios, defaults, save/restore
 
 ## 8A. Terminal Command Palette & “Database” Tables
 
@@ -153,34 +190,64 @@ The console exposes both a menu UI and a command palette for power users. The em
 - **Catalog**: A runtime registry of all tables/fields. Used by the TUI and command palette.
 - **Change Tracker**: Tracks any field whose current value differs from its compiled default. Persists until “restore-defaults” or power cycle.
 
-### 8A.2 Built-in Commands
+### 8A.2 Command Mode
 
-Commands are case-insensitive. Abbreviations in parentheses.
+Press **C** in browse mode to enter command mode. Commands support **partial prefix matching**:
 
-- `help` or `?` — show top-level help or `help <command>` for details.
-- `exit` | `quit` — terminate the console session cleanly and close USB-CDC.
-- `clear` — clear screen.
-- `version` — print firmware version, build time, git describe if available.
-- `uptime` — print ms since boot.
-- `tables` (alias: `list tables`) — list all tables in the catalog with ID, name, and brief.
-- `describe <table>` (alias: `desc`, `get table <table>`) — show fields in a table with ID, name, type, units, access, default, current, and “*” marker for non-default. `<table>` can be numeric ID or name.
-- `get <table>.<field>` — read a single field value (decoded units).
-- `set <table>.<field> <value>` — write a field, with parsing by type (bool, int, fixed-point, hex, enum). Range and access validated.
-- `peek <addr> <len>` — raw register/parameter read through the emulator map (wire-format, hex).
-- `poke <addr> <hex-bytes>` — raw write (validates writable regions).
-- `defaults list` — list all fields whose current value != compiled default (change tracker).
-- `defaults restore [<table>|<table>.<field>]` — restore defaults for the whole device or a subset.
-- `scenario list` — list JSON scenarios available in flash.
-- `scenario load <name>` — load and activate a scenario.
-- `scenario status` — show active scenario status and timers.
-- `nsp stats` — NSP counters by command code and error classes.
-- `serial stats` — UART/RS-485/SLIP stats including frames ok/bad, CRC, overruns.
-- `protect enable <name>` / `protect disable <name>` — toggle soft protections by symbolic name.
-- `fault clear [all|mask]` — clear latched faults globally or by mask (hex).
+**Examples:**
 
-All commands return a canonical status: `OK`, `ERR <code> <message>`.
+- `d t l` → `database table list`
+- `da t list` → `database table list`
+- `db tab get control.mode` → `database table get control.mode`
+- `d t s control.setpoint_rpm 5000` → `database table set control.setpoint_rpm 5000`
+- `def` → `database defaults`
+- `?` → `help`
 
-### 8A.3 Database Catalog Structure (Examples)
+### 8A.3 Built-in Commands
+
+Commands are **case-insensitive** with **prefix matching**. Aliases shown in parentheses.
+
+**General:**
+
+- `help` or `?` — Show help (or `help <command>` for details)
+- `quit` (`q`, `exit`) — Exit TUI
+- `version` — Firmware version, build time, git describe
+- `uptime` — Milliseconds since boot
+
+**Database Commands:**
+
+- `database` (`db`, `d`)
+  - `table` (`t`, `tab`)
+    - `list` (`ls`, `l`) — List all tables with ID, name, brief
+    - `get <table>.<field>` (`g`) — Read field value (decoded units)
+    - `set <table>.<field> <value>` (`s`) — Write field (type validated)
+    - `describe <table>` (`desc`) — Show all fields in table
+  - `defaults` (`def`)
+    - `list` — Show non-default fields (change tracker)
+    - `restore [<table>|<table>.<field>]` — Reset to compiled defaults
+
+**Protocol Commands:**
+
+- `peek <addr> <len>` — Raw register read (hex output)
+- `poke <addr> <hex-bytes>` — Raw register write
+- `nsp stats` — NSP command counters
+- `serial stats` — UART/RS-485/SLIP stats
+
+**Scenario Commands:**
+
+- `scenario list` — List JSON scenarios in flash
+- `scenario load <name>` — Load and activate scenario
+- `scenario status` — Active scenario timers
+
+**Protection Commands:**
+
+- `protect enable <name>` — Enable soft protection
+- `protect disable <name>` — Disable soft protection
+- `fault clear [all|mask]` — Clear latched faults
+
+All commands return: `OK` or `ERR <code> <message>`.
+
+### 8A.4 Database Catalog Structure (Examples)
 
 - `serial` (Table 1)
   - `status` (1.1, bool)

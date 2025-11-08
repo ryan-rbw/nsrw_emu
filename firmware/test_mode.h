@@ -2,18 +2,15 @@
  * @file test_mode.h
  * @brief Checkpoint Test Mode Functions
  *
- * This file provides test functions for each checkpoint in the implementation plan.
- * Enable specific checkpoints by defining CHECKPOINT_X_Y before including this file.
+ * All checkpoint tests now run at boot and cache results for TUI display.
+ * No more #define CHECKPOINT_X_Y needed - tests always execute.
  *
- * Usage:
- *   #define CHECKPOINT_3_1
- *   #include "test_mode.h"
- *
+ * New flow:
  *   int main(void) {
- *       #ifdef CHECKPOINT_3_1
- *       test_crc_vectors();
- *       while(1) { sleep_ms(1000); }  // Halt for inspection
- *       #endif
+ *       test_results_init();
+ *       run_all_checkpoint_tests();  // Fast, results cached
+ *       tui_init();                   // Enter interactive TUI
+ *       main_loop();                  // TUI shows test results in menu
  *   }
  */
 
@@ -22,6 +19,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "test_results.h"
 
 // ============================================================================
 // Phase 3: Core Communication Drivers
@@ -204,24 +202,62 @@ void test_nsp_commands(void);
  * - Metadata functions (names, units, fault info)
  *
  * Prints results to console.
- * Enable with: #define CHECKPOINT_7_1
  */
 void test_protection(void);
+
+// ============================================================================
+// Master Test Runner
+// ============================================================================
+
+/**
+ * @brief Run all checkpoint tests and cache results
+ *
+ * Executes all tests from Phases 3-7 at boot time.
+ * Results are stored in g_test_results for TUI display.
+ *
+ * Call this ONCE at startup before entering TUI.
+ */
+void run_all_checkpoint_tests(void);
 
 // ============================================================================
 // Helper Macros
 // ============================================================================
 
 /**
- * @brief Print test result with checkmark or X
+ * @brief Print test result with checkmark or X (and record in registry)
+ *
+ * Usage: TEST_RESULT("CRC empty buffer", crc == 0xFFFF);
  */
-#define TEST_RESULT(name, passed) \
-    printf("  %s: %s\n", (name), (passed) ? "✓ PASS" : "✗ FAIL")
+#define TEST_RESULT(name, passed) do { \
+    bool _passed = (passed); \
+    printf("  %s: %s\n", (name), _passed ? "✓ PASS" : "✗ FAIL"); \
+    test_record_result((name), _passed, 0); \
+} while(0)
 
 /**
  * @brief Print test section header
  */
 #define TEST_SECTION(name) \
     printf("\n=== %s ===\n", (name))
+
+/**
+ * @brief Begin checkpoint test (with result recording)
+ *
+ * Usage: TEST_CHECKPOINT_BEGIN(3, 1, "CRC-CCITT");
+ */
+#define TEST_CHECKPOINT_BEGIN(phase, cp, name) do { \
+    printf("\n╔════════════════════════════════════════════════════════════╗\n"); \
+    printf("║  CHECKPOINT %d.%d: %-42s║\n", (phase), (cp), (name)); \
+    printf("╚════════════════════════════════════════════════════════════╝\n"); \
+    test_checkpoint_begin((phase), (cp), (name)); \
+} while(0)
+
+/**
+ * @brief End checkpoint test (and compute summary)
+ */
+#define TEST_CHECKPOINT_END() do { \
+    test_checkpoint_end(); \
+    printf("\n"); \
+} while(0)
 
 #endif // TEST_MODE_H

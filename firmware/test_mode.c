@@ -2333,5 +2333,92 @@ void test_protection(void) {
 }
 
 // ============================================================================
+// Master Test Runner
+// ============================================================================
+
+/**
+ * @brief Run all checkpoint tests and cache results for TUI
+ *
+ * This runs at boot before entering the TUI. Tests execute quickly (<2 seconds)
+ * and results are cached for display in the "Built-In Tests" table.
+ */
+void run_all_checkpoint_tests(void) {
+    printf("\n");
+    printf("╔══════════════════════════════════════════════════════════════╗\n");
+    printf("║           NRWA-T6 EMULATOR BUILT-IN TEST SUITE               ║\n");
+    printf("╚══════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    printf("Running all checkpoint tests... (results cached for TUI)\n");
+    printf("\n");
+
+    // Phase 3: Core Communication Drivers
+    TEST_CHECKPOINT_BEGIN(3, 1, "CRC-CCITT");
+    test_crc_vectors();
+    TEST_CHECKPOINT_END();
+
+    TEST_CHECKPOINT_BEGIN(3, 2, "SLIP Codec");
+    test_slip_codec();
+    TEST_CHECKPOINT_END();
+
+    TEST_CHECKPOINT_BEGIN(3, 3, "RS-485 Loopback");
+    test_rs485_loopback();
+    TEST_CHECKPOINT_END();
+
+    TEST_CHECKPOINT_BEGIN(3, 4, "NSP Protocol");
+    test_nsp_ping();
+    TEST_CHECKPOINT_END();
+
+    // Phase 4: Utilities Foundation
+    TEST_CHECKPOINT_BEGIN(4, 1, "Ring Buffer");
+    test_ringbuf_stress();
+    TEST_CHECKPOINT_END();
+
+    TEST_CHECKPOINT_BEGIN(4, 2, "Fixed-Point Math");
+    test_fixedpoint_accuracy();
+    TEST_CHECKPOINT_END();
+
+    // Phase 5: Device Model & Physics
+    TEST_CHECKPOINT_BEGIN(5, 1, "Register Map");
+    test_register_map();
+    TEST_CHECKPOINT_END();
+
+    TEST_CHECKPOINT_BEGIN(5, 2, "Wheel Physics");
+    test_wheel_physics();
+    TEST_CHECKPOINT_END();
+
+    TEST_CHECKPOINT_BEGIN(5, 3, "Reset & Faults");
+    test_reset_and_faults();
+    TEST_CHECKPOINT_END();
+
+    // Phase 6: NSP Commands
+    TEST_CHECKPOINT_BEGIN(6, 1, "NSP Commands");
+    test_nsp_commands();
+    TEST_CHECKPOINT_END();
+
+    // Phase 7: Protection System
+    TEST_CHECKPOINT_BEGIN(7, 1, "Protection System");
+    test_protection();
+    TEST_CHECKPOINT_END();
+
+    // Print summary
+    char summary[128];
+    test_get_summary(summary, sizeof(summary));
+    printf("\n");
+    printf("╔══════════════════════════════════════════════════════════════╗\n");
+    printf("║  TEST SUMMARY                                                ║\n");
+    printf("╚══════════════════════════════════════════════════════════════╝\n");
+    printf("%s\n", summary);
+
+    if (g_test_results.all_passed) {
+        printf("\n✓✓✓ ALL TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("\n✗✗✗ SOME TESTS FAILED ✗✗✗\n");
+        printf("View details in TUI: Built-In Tests table\n");
+    }
+    printf("\n");
+    printf("Press any key to enter TUI...\n");
+}
+
+// ============================================================================
 // Future Checkpoints
 // ============================================================================

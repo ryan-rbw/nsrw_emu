@@ -21,8 +21,13 @@ add_executable(nrwa_t6_emulator
     device/nss_nrwa_t6_telemetry.c
     # Protection system (Phase 7)
     device/nss_nrwa_t6_protection.c
-    # Test mode
+    # Test mode (runs at boot, results cached)
     test_mode.c
+    test_results.c
+    # Console & TUI (Phase 8)
+    console/tui.c
+    console/tables.c
+    console/table_tests.c
 )
 
 # Pass version string as compile definition

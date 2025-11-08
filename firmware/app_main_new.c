@@ -136,28 +136,23 @@ int main(void) {
     // ========================================================================
 
     uint32_t heartbeat_counter = 0;
-    uint32_t tui_refresh_counter = 0;
     bool led_state = false;
 
     while (1) {
-        // Heartbeat LED: Toggle every 1 second (20 iterations × 50ms = 1000ms)
-        if (heartbeat_counter++ >= 20) {
+        // Heartbeat blink (1 Hz)
+        if (heartbeat_counter++ >= 500) {
             heartbeat_counter = 0;
             led_state = !led_state;
             gpio_set_heartbeat_led(led_state);
         }
 
-        // Periodic TUI refresh: Every 500ms to update uptime
-        if (tui_refresh_counter++ >= 10) {
-            tui_refresh_counter = 0;
-            tui_update(true);  // Force periodic refresh for live values
-        }
+        // Update TUI (non-blocking, only redraws if needed)
+        tui_update(false);
 
         // Handle keyboard input
         if (tui_handle_input()) {
-            // Input was processed - force immediate redraw
+            // Input was processed - force redraw on next update
             tui_update(true);
-            tui_refresh_counter = 0;  // Reset periodic counter after input
         }
 
         // TODO: Phase 3 - Poll RS-485 for incoming NSP packets

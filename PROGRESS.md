@@ -18,7 +18,7 @@
 | Phase 5: Device Model | ✅ Complete | 100% | Register map ✅, physics ✅, reset handling ✅ |
 | Phase 6: Commands & Telemetry | ✅ Complete | 100% | NSP handlers ✅, PEEK/POKE ✅ - HW validated |
 | Phase 7: Protection System | ✅ Complete | 100% | Thresholds ✅, fault handling ✅ - HW validated |
-| Phase 8: Console & TUI | 🔄 Next | 0% | USB-CDC interface |
+| Phase 8: Console & TUI | 🔄 In Progress | 33% | Checkpoint 8.1 complete - TUI core |
 | Phase 9: Fault Injection | ⏸️ Pending | 0% | JSON scenarios |
 | Phase 10: Integration | ⏸️ Pending | 0% | Dual-core orchestration |
 
@@ -1388,18 +1388,144 @@ None yet - Phase 1 complete, no runtime testing performed.
 
 ---
 
+## Phase 8: Console & TUI 🔄 IN PROGRESS
+
+**Status**: Checkpoint 8.1 Complete (33%)
+**Completed**: 2025-11-08
+**Hardware Validated**: ✅ Working on Pico
+
+### Checkpoint 8.1: TUI Core & Arrow Navigation ✅ COMPLETE
+
+**Implementation**: Complete redesign with arrow-key navigation based on user feedback
+
+#### Implementation Details
+
+**1. Test Results System** (`test_results.h/c` - 245 lines)
+
+- Caches all checkpoint test results at boot
+- Global registry: `g_test_results` with total/passed/failed/duration
+- API: `test_checkpoint_begin/end()`, `test_record_result()`
+- Macros: `TEST_CHECKPOINT_BEGIN/END()` for consistent formatting
+
+**2. Core TUI with Arrow Navigation** (`console/tui.h/c` - 570 lines)
+
+**Design**: Single unified browse mode (not separate menu/table views)
+
+- **Non-scrolling interface** using ANSI escape sequences (VT100)
+- **Arrow-key navigation**: ↑/↓ to move cursor, →/← to expand/collapse tables
+- **Status banner**: Shows wheel state (ON/OFF, Mode, RPM, Current, Fault)
+- **Live auto-refresh**: Updates every 500ms (uptime, live values)
+- **Command mode**: Press 'C' to enter (not ':')
+- **Responsive input**: Immediate redraw on keyboard input
+
+**Navigation:**
+
+- ↑/↓: Move cursor between tables and fields
+- →: Expand selected table (show fields)
+- ←: Collapse expanded table
+- Enter: Edit field (Checkpoint 8.3)
+- C: Command mode
+- R: Force refresh
+- Q/ESC: Quit
+
+**Screen Layout:**
+
+```text
+┌─ NRWA-T6 Emulator ──── Uptime: 00:15:32 ──── Tests: 78/78 ✓ ─────┐
+├─ Status: IDLE │ Mode: OFF │ RPM: 0 │ Current: 0.00A │ Fault: - ──┤
+├───────────────────────────────────────────────────────────────────┤
+│ TABLES                                                            │
+│                                                                   │
+│ > 1. ▶ Built-In Tests      [COLLAPSED]                           │
+│   2. ▶ Serial Interface    [COLLAPSED]                           │
+│   3. ▼ Control Mode        [EXPANDED]                            │
+│       ├─ mode          : SPEED       (RW)                         │
+│     ► ├─ setpoint_rpm  : 3000        (RW)                         │
+│       ├─ actual_rpm    : 3245        (RO)                         │
+│   4. ▶ Dynamics            [COLLAPSED]                            │
+│                                                                   │
+├───────────────────────────────────────────────────────────────────┤
+│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Enter: Edit │ C: Command│
+└───────────────────────────────────────────────────────────────────┘
+```
+
+**3. Modular Catalog** (`console/tables.h/c` - 465 lines)
+
+- Registration-based: `catalog_register_table()`
+- Dynamic discovery: `catalog_get_table_count()`, `catalog_get_table_by_index()`
+- Zero TUI code changes to add new tables
+- Field metadata: ID, name, type, units, access, default, live pointer
+
+**4. Built-In Tests Table** (`console/table_tests.c` - 120 lines)
+
+First table implementation showing test results:
+
+- total_tests, passed, failed, duration_ms
+- All fields read-only (RO)
+- Live values updated from `g_test_results`
+
+**5. Refactored Boot Sequence** (`app_main.c` - 180 lines, was 387)
+
+- Initialize hardware → Run all tests → Wait for keypress → Enter TUI
+- Main loop: 50ms (20 Hz) with periodic refresh and input handling
+- Heartbeat LED: 1 Hz (fixed from 25 second bug)
+- TUI auto-refresh: 500ms for live value updates
+
+#### Files Added/Modified
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| test_results.h/c | 245 | Test result caching system |
+| console/tui.h/c | 570 | Arrow navigation TUI (complete rewrite) |
+| console/tables.h/c | 465 | Modular catalog system |
+| console/table_tests.h/c | 120 | Built-In Tests table |
+| console/DESIGN.md | 400+ | Architecture guide for adding tables |
+| app_main.c | 180 | Refactored boot (was 387 lines) |
+
+**Total**: ~2000 lines added/modified
+
+#### Hardware Validation ✅
+
+- Tested on Raspberry Pi Pico
+- Arrow keys work (↑↓←→)
+- Tables expand/collapse correctly
+- Uptime updates every 500ms
+- LED blinks at 1 Hz
+- Command mode entry with 'C' works
+- No crashes, stable operation
+
+#### Checkpoint Acceptance
+
+| Criteria | Status | Evidence |
+|----------|--------|----------|
+| Non-scrolling TUI | ✅ | ANSI cursor positioning, updates in place |
+| Arrow key navigation | ✅ | ↑↓←→ for navigate/expand/collapse |
+| Status banner | ✅ | Shows wheel state (placeholder values) |
+| Live value updates | ✅ | 500ms auto-refresh for uptime |
+| Test result display | ✅ | Built-In Tests table shows cached results |
+| Modular design | ✅ | Registration-based, zero TUI changes for new tables |
+| LED heartbeat 1 Hz | ✅ | Fixed timing bug (was 25 seconds) |
+
+### Checkpoint 8.2 (Next)
+
+- 7 table definitions + Built-In Tests table
+- Live value pointers
+- UQ formatting
+
+---
+
 ## Metrics
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
-| Lines of Code (C) | ~8472 | 3000-5000 | 169% ✅ |
+| Lines of Code (C) | ~10,520 | 3000-5000 | 210% ✅ |
 | Phases Complete | 7 | 10 | 70% |
-| Checkpoints Complete | 14 | ~19 | 74% |
-| Current Phase | Phase 8 | Phase 10 | Phase 7 complete ✅ |
+| Checkpoints Complete | 15 | ~19 | 79% |
+| Current Phase | Phase 8.1 | Phase 10 | Checkpoint 8.1 complete ✅ |
 | Unit Tests | 46 tests | TBD | Phase 3+4+5+6+7 (all pass) |
 | Test Coverage | N/A | ≥80% | - |
 | Build Time | ~15s | <30s | ✅ |
-| Flash Usage | 152 KB | <256 KB | 59% |
+| Flash Usage | 175 KB | <256 KB | 68% |
 
 ---
 

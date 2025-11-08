@@ -683,27 +683,67 @@ Each field encoded in UQ format per ICD
 
 ### Phase 8: Console & TUI 🖥️
 
-**Goal**: USB-CDC terminal with table/field catalog and command palette
+**Goal**: USB-CDC terminal with arrow-key navigation, expand/collapse tables, and command palette
 
-**Checkpoints**: 3 (Menu UI 33%, Tables/Fields 66%, Command palette 100%)
-- **8.1**: Implement menu system with 7 tables
-- **8.2**: Implement table/field catalog with metadata
-- **8.3**: Implement command palette (help, get, set, describe, etc.)
-- **Test**: Navigate menus, read/write fields, verify defaults tracking
+**Checkpoints**: 3 (TUI Core 33%, Table Catalog 66%, Command Palette 100%)
+
+- **8.1**: Implement TUI core with arrow navigation and status banner
+- **8.2**: Implement table/field catalog with 7 base tables
+- **8.3**: Implement command palette with partial matching
+- **Test**: Navigate with arrows, expand/collapse tables, execute commands
 
 **Tasks**:
 
-#### 8.1 Menu System (`tui.c`)
-- USB-CDC stdio
-- Navigation: numbers select item, `q` back, `r` refresh, `e` edit
-- 7 top-level tables per [SPEC.md:136-143](SPEC.md#L136-L143):
-  1. Serial Interface
-  2. NSP Layer
-  3. Control Mode
-  4. Dynamics
-  5. Protections
-  6. Telemetry Blocks
-  7. Config & JSON
+#### 8.1 TUI Core (`tui.c`) ✅ COMPLETE
+
+**Implementation Completed:**
+
+- **Non-scrolling interface** using ANSI escape sequences (VT100)
+- **Arrow-key navigation**: ↑/↓ to navigate, →/← to expand/collapse
+- **Status banner**: Shows wheel state (ON/OFF, Mode, RPM, Current, Fault)
+- **Single browse mode**: Unified view with expandable tables
+- **Command mode entry**: Press **C** (not ':') to enter command palette
+- **Test result caching**: Boot tests run once, results displayed in TUI
+
+**Screen Layout:**
+
+```text
+┌─ NRWA-T6 Emulator ──── Uptime: 00:15:32 ──── Tests: 78/78 ✓ ─────┐
+├─ Status: ON │ Mode: SPEED │ RPM: 3245 │ Current: 1.25A │ Fault: -┤
+├───────────────────────────────────────────────────────────────────┤
+│ TABLES                                                            │
+│                                                                   │
+│ > 1. ▶ Built-In Tests      [COLLAPSED]                           │
+│   2. ▼ Control Mode        [EXPANDED]                            │
+│       ├─ mode          : SPEED       (RW)                         │
+│     ► ├─ setpoint_rpm  : 3000        (RW)                         │
+│       ├─ actual_rpm    : 3245        (RO)                         │
+│   3. ▶ Dynamics            [COLLAPSED]                            │
+│                                                                   │
+├───────────────────────────────────────────────────────────────────┤
+│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Enter: Edit │ C: Command│
+└───────────────────────────────────────────────────────────────────┘
+```
+
+**Navigation:**
+
+- ↑/↓: Move cursor
+- →: Expand table
+- ←: Collapse table
+- Enter: Edit field (Checkpoint 8.3)
+- C: Command mode
+- Q/ESC: Quit
+- R: Refresh
+
+**Files Created:**
+
+- `console/tui.c` - Complete rewrite with arrow navigation (570 lines)
+- `console/tui.h` - Updated state structure for browse mode
+- `console/table_tests.c` - Built-In Tests table (120 lines)
+- `console/table_tests.h` - Header
+- `test_results.c/h` - Test result caching system (245 lines)
+
+**Hardware Validated:** Pending (build successful, ready to flash)
 
 #### 8.2 Table/Field Catalog (`tables.c`)
 - Metadata structure:
@@ -724,26 +764,41 @@ Each field encoded in UQ format per ICD
 - `get <table>.<field>`: Read and format value
 - `set <table>.<field> <value>`: Parse and write with validation
 
-#### 8.3 Command Palette
-Per [SPEC.md:158-180](SPEC.md#L158-L180):
+#### 8.3 Command Palette with Partial Matching
 
+Press **C** in browse mode to enter command mode. Commands support **partial prefix matching**.
+
+**Examples:**
+
+```text
+> d t l                              → database table list
+> db tab get control.mode            → database table get control.mode
+> d t s control.setpoint_rpm 5000    → database table set control.setpoint_rpm 5000
+> def                                → database defaults
+> ?                                  → help
 ```
-> help
-Available commands:
-  help [cmd]                    Show help
-  version                       Firmware version
-  tables                        List all tables
-  describe <table>              Show table fields
-  get <table>.<field>           Read field
-  set <table>.<field> <val>     Write field
-  peek <addr> <len>             Raw register read
-  poke <addr> <hex>             Raw register write
-  defaults list                 Show non-default fields
-  defaults restore [scope]      Reset to defaults
-  scenario load <name>          Load JSON scenario
-  nsp stats                     NSP command counters
-  fault clear [mask]            Clear latched faults
-```
+
+**Command Structure:**
+
+- `help`, `?` - Show help
+- `database` (`db`, `d`)
+  - `table` (`t`, `tab`)
+    - `list` (`ls`, `l`) - List all tables
+    - `get <table>.<field>` (`g`) - Read field value
+    - `set <table>.<field> <value>` (`s`) - Write field value
+    - `describe <table>` (`desc`) - Show table fields
+  - `defaults` (`def`)
+    - `list` - Show non-default fields
+    - `restore` - Reset to compiled defaults
+- `version` - Firmware version
+- `quit` (`q`, `exit`) - Exit TUI
+
+**Implementation:**
+
+1. **Parser**: Split input by spaces, match each token against command tree
+2. **Prefix matching**: Match shortest unambiguous prefix (e.g., "d" → "database")
+3. **Aliases**: Pre-defined shortcuts (e.g., "db", "d" both map to "database")
+4. **Execution**: Execute when fully matched or ask for clarification if ambiguous
 
 #### 8.4 Change Tracker
 - Track `dirty` bit when value != default

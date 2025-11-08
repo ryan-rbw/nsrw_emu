@@ -113,7 +113,7 @@ The emulator provides a USB-CDC serial console for monitoring and control.
    # Connect to COM port at 115200 baud
    ```
 
-2. You should see the startup banner:
+2. You should see the startup banner followed by built-in test results:
    ```
    ╔════════════════════════════════════════════════════════════╗
    ║     NRWA-T6 Reaction Wheel Emulator                       ║
@@ -121,25 +121,83 @@ The emulator provides a USB-CDC serial console for monitoring and control.
    ╚════════════════════════════════════════════════════════════╝
 
    Firmware Version : v0.1.0-7e042b4
-   Build Date       : Nov  5 2025 11:55:32
+   Build Date       : Nov  8 2025 14:23:15
    Target Platform  : RP2040 (Pico)
    Board ID         : E6614103E73F2B34
 
-   Ready. Waiting for commands...
-   Type 'help' for console commands.
+   [Core0] Running Built-In Test Suite...
+
+   ╔════════════════════════════════════════════════════════════╗
+   ║  CHECKPOINT 3.1: CRC-CCITT                                ║
+   ╚════════════════════════════════════════════════════════════╝
+
+   [CRC] Empty buffer: PASS
+   [CRC] Single byte (0x12): PASS
+   ...
+
+   ✓✓✓ ALL TESTS PASSED (46/46) ✓✓✓
+
+   Waiting for keypress...
    ```
 
-### Console Commands (Phase 8)
+3. Press any key to enter the interactive TUI
 
-*Coming soon - full command palette will be available in Phase 8*
+### TUI Interface (Phase 8+)
 
-Example commands:
-- `help` - Show available commands
+The TUI is a **non-scrolling, live-updating interface** like `top` or `htop` with arrow-key navigation:
+
+```text
+┌─ NRWA-T6 Emulator ──── Uptime: 00:15:32 ──── Tests: 78/78 ✓ ─────┐
+├─ Status: ON │ Mode: SPEED │ RPM: 3245 │ Current: 1.25A │ Fault: -┤
+├───────────────────────────────────────────────────────────────────┤
+│ TABLES                                                            │
+│                                                                   │
+│ > 1. ▶ Built-In Tests      [COLLAPSED]                           │
+│   2. ▼ Control Mode        [EXPANDED]                            │
+│       ├─ mode          : SPEED       (RW)                         │
+│     ► ├─ setpoint_rpm  : 3000        (RW)    ← cursor            │
+│       ├─ actual_rpm    : 3245        (RO)                         │
+│       └─ pid_enabled   : true        (RW)                         │
+│   3. ▶ Dynamics            [COLLAPSED]                            │
+│                                                                   │
+├───────────────────────────────────────────────────────────────────┤
+│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Enter: Edit │ C: Command│
+└───────────────────────────────────────────────────────────────────┘
+```
+
+**Navigation:**
+
+- **↑/↓** - Move cursor between tables and fields
+- **→** - Expand selected table to show fields
+- **←** - Collapse expanded table
+- **Enter** - Edit selected field value (Phase 8.3)
+- **C** - Enter command mode
+- **R** - Force refresh
+- **Q** or **ESC** - Quit
+
+### Command Mode (Phase 8.3)
+
+Press **C** to enter command mode. Commands support **partial prefix matching**:
+
+**Examples:**
+```
+> d t l                              → database table list
+> db tab get control.mode            → get field value
+> d t s control.setpoint_rpm 5000    → set field value
+> def                                → show non-defaults
+> ?                                  → help
+```
+
+**Available Commands:**
+
+- `help`, `?` - Show available commands
+- `database` (`db`, `d`)
+  - `table list` - List all tables
+  - `table get <table>.<field>` - Read field value
+  - `table set <table>.<field> <value>` - Write field value
+  - `defaults` - Show non-default values
 - `version` - Firmware version and build info
-- `tables` - List all configuration tables
-- `get dynamics.speed_rpm` - Read current wheel speed
-- `set control.mode SPEED` - Change to speed control mode
-- `scenario load overspeed_test` - Load fault injection scenario
+- `quit` - Exit TUI
 
 ### RS-485 Communication
 
@@ -207,7 +265,7 @@ nsrw_emu/
 
 ## Development Status
 
-**Current Phase**: Phase 8 (Console & TUI) - 70% Complete ✅
+**Current Phase**: Phase 8 (Console & TUI) - Checkpoint 8.1 Complete (33%) 🔄
 
 - [x] Phase 1: Project Foundation
 - [x] Phase 2: Platform Layer
@@ -216,15 +274,17 @@ nsrw_emu/
 - [x] Phase 5: Device Model & Physics
 - [x] Phase 6: Device Commands & Telemetry
 - [x] Phase 7: Protection System
-- [ ] Phase 8: Console & TUI
+- [x] Phase 8.1: TUI Core & Test System Refactor
+- [ ] Phase 8.2: Table Catalog (7 base tables)
+- [ ] Phase 8.3: Command Palette
 - [ ] Phase 9: Fault Injection System
 - [ ] Phase 10: Main Application & Dual-Core
 
 **Metrics**:
-- **Lines of Code**: ~8472 (169% of target)
-- **Checkpoints Complete**: 14/~19 (74%)
-- **Unit Tests**: 46 tests (all passing on hardware)
-- **Flash Usage**: 152 KB / 256 KB (59%)
+- **Lines of Code**: ~10,520 (210% of target)
+- **Checkpoints Complete**: 15/~19 (79%)
+- **Unit Tests**: 46 tests (all passing, cached at boot)
+- **Flash Usage**: 175 KB / 256 KB (68%)
 
 See [PROGRESS.md](PROGRESS.md) for detailed status and [IMP.md](IMP.md) for implementation plan.
 
@@ -276,9 +336,9 @@ This project follows the implementation plan in [IMP.md](IMP.md). Each phase has
 - **[SPEC.md](SPEC.md)** - High-level emulator specification
 - **[IMP.md](IMP.md)** - Phased implementation plan (10 phases)
 - **[PROGRESS.md](PROGRESS.md)** - Development status and completed work
+- **[firmware/console/DESIGN.md](firmware/console/DESIGN.md)** - Table catalog architecture guide
 - **[docs/](docs/)** - Design baseline and requirements
   - [NRWA-T6 ICD](docs/NRWA-T6_ICD_v10.02.pdf) - Official hardware datasheet (TO BE ADDED)
-  - [Reset/Fault Requirements](docs/RESET_FAULT_REQUIREMENTS.md) - Reset handling specifications
 
 ### External References
 
@@ -294,4 +354,4 @@ This project follows the implementation plan in [IMP.md](IMP.md). Each phase has
 
 **Version**: 0.1.0
 **Last Updated**: 2025-11-08
-**Status**: Phase 7 Complete - Protection System Integrated & Tested
+**Status**: Phase 8 Checkpoint 8.1 Complete - TUI Core & Test System Refactor
