@@ -15,7 +15,7 @@ This document outlines the implementation plan for a hardware-in-the-loop emulat
 - **Protocol Fidelity**: RS-485 with SLIP framing, NSP protocol, CCITT CRC matching ICD spec
 - **Real-time Performance**: 100 Hz physics tick with <200µs jitter, <5ms command response
 - **Dual-Core Architecture**: Core0 for communications, Core1 for physics simulation
-- **Rich Developer UX**: Terminal UI with table/field catalog and command palette
+- **Rich Developer UX**: Terminal UI with arrow-key navigation and table/field catalog
 - **Fault Injection**: JSON-driven deterministic error/fault scenarios
 - **Single Binary**: UF2 file for drag-and-drop programming
 
@@ -683,14 +683,13 @@ Each field encoded in UQ format per ICD
 
 ### Phase 8: Console & TUI 🖥️
 
-**Goal**: USB-CDC terminal with arrow-key navigation, expand/collapse tables, and command palette
+**Goal**: USB-CDC terminal with arrow-key navigation and expand/collapse tables
 
-**Checkpoints**: 3 (TUI Core 33%, Table Catalog 66%, Command Palette 100%)
+**Checkpoints**: 2 (TUI Core 50%, Table Catalog 100%)
 
 - **8.1**: Implement TUI core with arrow navigation and status banner
 - **8.2**: Implement table/field catalog with 7 base tables
-- **8.3**: Implement command palette with partial matching
-- **Test**: Navigate with arrows, expand/collapse tables, execute commands
+- **Test**: Navigate with arrows, expand/collapse tables, view field values
 
 **Tasks**:
 
@@ -702,7 +701,7 @@ Each field encoded in UQ format per ICD
 - **Arrow-key navigation**: ↑/↓ to navigate, →/← to expand/collapse
 - **Status banner**: Shows wheel state (ON/OFF, Mode, RPM, Current, Fault)
 - **Single browse mode**: Unified view with expandable tables
-- **Command mode entry**: Press **C** (not ':') to enter command palette
+- **Refresh**: Press **R** to force screen refresh
 - **Test result caching**: Boot tests run once, results displayed in TUI
 
 **Screen Layout:**
@@ -764,46 +763,12 @@ Each field encoded in UQ format per ICD
 - `get <table>.<field>`: Read and format value
 - `set <table>.<field> <value>`: Parse and write with validation
 
-#### 8.3 Command Palette with Partial Matching
+#### 8.3 Field Value Display
 
-Press **C** in browse mode to enter command mode. Commands support **partial prefix matching**.
-
-**Examples:**
-
-```text
-> d t l                              → database table list
-> db tab get control.mode            → database table get control.mode
-> d t s control.setpoint_rpm 5000    → database table set control.setpoint_rpm 5000
-> def                                → database defaults
-> ?                                  → help
-```
-
-**Command Structure:**
-
-- `help`, `?` - Show help
-- `database` (`db`, `d`)
-  - `table` (`t`, `tab`)
-    - `list` (`ls`, `l`) - List all tables
-    - `get <table>.<field>` (`g`) - Read field value
-    - `set <table>.<field> <value>` (`s`) - Write field value
-    - `describe <table>` (`desc`) - Show table fields
-  - `defaults` (`def`)
-    - `list` - Show non-default fields
-    - `restore` - Reset to compiled defaults
-- `version` - Firmware version
-- `quit` (`q`, `exit`) - Exit TUI
-
-**Implementation:**
-
-1. **Parser**: Split input by spaces, match each token against command tree
-2. **Prefix matching**: Match shortest unambiguous prefix (e.g., "d" → "database")
-3. **Aliases**: Pre-defined shortcuts (e.g., "db", "d" both map to "database")
-4. **Execution**: Execute when fully matched or ask for clarification if ambiguous
-
-#### 8.4 Change Tracker
-- Track `dirty` bit when value != default
-- `defaults list`: Print diff
-- `defaults restore`: Reset to compiled defaults
+- All field values displayed with units
+- Read-only fields clearly marked (RO)
+- Read-write fields marked (RW)
+- Values formatted according to type (hex, decimal, fixed-point)
 
 **Deliverables**:
 - `console/tui.c`
@@ -811,10 +776,11 @@ Press **C** in browse mode to enter command mode. Commands support **partial pre
 - Catalog definitions for all 7 tables
 
 **Acceptance**:
-- Navigate to Dynamics table, see live speed
-- `set control.mode SPEED` changes mode
-- `defaults list` shows non-defaults
-- Command palette autocomplete works
+- Navigate to Dynamics table with arrow keys
+- Expand/collapse tables with →/← keys
+- All 8 tables visible with field counts
+- Field values display with proper units and RO/RW indicators
+- TUI refreshes without flicker
 
 ---
 
@@ -1097,7 +1063,7 @@ def test_speed_mode():
 4. **Add protections**: Overspeed detection → fault latching → CLEAR-FAULT
    *Validates fault semantics*
 
-5. **Add TUI**: Menu → table display → command palette
+5. **Add TUI**: Arrow-key navigation → table display → field viewing
    *Developer UX working*
 
 6. **Add injection**: JSON loader → scenario engine

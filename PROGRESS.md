@@ -18,7 +18,7 @@
 | Phase 5: Device Model | ✅ Complete | 100% | Register map ✅, physics ✅, reset handling ✅ |
 | Phase 6: Commands & Telemetry | ✅ Complete | 100% | NSP handlers ✅, PEEK/POKE ✅ - HW validated |
 | Phase 7: Protection System | ✅ Complete | 100% | Thresholds ✅, fault handling ✅ - HW validated |
-| Phase 8: Console & TUI | ✅ Complete | 100% | TUI core, 8 tables, command palette |
+| Phase 8: Console & TUI | ✅ Complete | 100% | TUI core, 8 tables, optimized (151 KB) |
 | Phase 9: Fault Injection | 🔄 Next | 0% | JSON scenarios |
 | Phase 10: Integration | ⏸️ Pending | 0% | Dual-core orchestration |
 
@@ -1658,46 +1658,51 @@ OK: control.mode = 1
 
 ## Phase 8: Console & TUI ✅ COMPLETE
 
-**Status**: Complete (100%)
-**Duration**: Checkpoints 8.1, 8.2, 8.3
-**Total Implementation**: ~2,900 lines across 29 files
+**Status**: Complete (100%) + Optimized
+**Duration**: Checkpoints 8.1, 8.2
+**Final Size**: 151 KB flash (59% usage) after optimization
 
 ### Phase 8 Summary
 
-Phase 8 delivered a complete non-scrolling TUI with:
+Phase 8 delivered a lean, optimized non-scrolling TUI with:
 
 - Arrow key navigation
 - 8 tables with 53 total fields
-- Command palette with partial prefix matching
-- Field editing capability
 - Test result caching system
 - Modular registration-based architecture
+
+**Optimization**: Command palette was removed during flash optimization (saved 68 KB).
+Focus shifted to clean arrow-key navigation model.
 
 ### Phase 8 Achievements
 
 - ✅ Non-scrolling interface (like top/htop)
 - ✅ Arrow navigation (↑↓←→)
 - ✅ Expand/collapse tables in-place
-- ✅ Command mode with table list
-- ✅ Partial prefix matching ("d t l" works)
-- ✅ Field editing via command pre-fill
 - ✅ 8 tables, 53 fields total
 - ✅ Test caching (46 tests, all passing)
 - ✅ Modular table registration
+- ✅ Optimized to 151 KB (40% size reduction)
 
 ### Phase 8 Files Summary
 
-**Created**: 29 files
+**Created**: 27 files (after optimization)
 
 - 16 table files (.c/.h pairs for 8 tables)
-- 6 TUI core files (tui, tables, commands, test_results)
+- 4 TUI core files (tui, tables, test_results)
 - 1 design doc (DESIGN.md)
 
-**Modified**: 3 files
+**Removed during optimization**:
 
-- app_main.c (refactored for TUI)
-- CMakeLists.txt (added all new files)
-- test_mode.c/h (added registry integration)
+- commands.c/h (command palette - 517 lines)
+- 3 backup files (38 KB)
+
+**Modified**: 5 files
+
+- app_main.c (startup banner optimized)
+- CMakeLists.txt (size optimizations added)
+- test_mode.h (simplified output macros)
+- tui.c/h (command mode removed)
 
 ### What's Next After Phase 8
 
