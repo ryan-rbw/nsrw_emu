@@ -29,6 +29,7 @@ void test_results_init(void) {
     memset(test_storage, 0, sizeof(test_storage));
     memset(test_counts, 0, sizeof(test_counts));
     current_checkpoint = NULL;
+    g_test_results.all_passed = true;  // Assume all pass until failure detected
 }
 
 // ============================================================================
