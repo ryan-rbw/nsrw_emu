@@ -3,13 +3,11 @@
  * @brief Text User Interface Implementation (Redesigned)
  *
  * Arrow-key navigation with expand/collapse tables.
- * Single unified browse view + command mode.
  */
 
 #include "tui.h"
 #include "tables.h"
 #include "test_results.h"
-#include "commands.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -102,12 +100,8 @@ void tui_update(bool force_redraw) {
             tui_render_browse();
             break;
 
-        case TUI_MODE_COMMAND:
-            tui_render_command_palette();
-            break;
-
         case TUI_MODE_EDIT:
-            // Field editing (Checkpoint 8.3)
+            // Field editing (future enhancement)
             break;
     }
 
@@ -119,7 +113,6 @@ void tui_update(bool force_redraw) {
 // ============================================================================
 
 static bool tui_handle_browse_input(int key);
-static bool tui_handle_command_input(int key);
 
 bool tui_handle_input(void) {
     int key = tui_getkey();
@@ -131,9 +124,6 @@ bool tui_handle_input(void) {
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
             return tui_handle_browse_input(key);
-
-        case TUI_MODE_COMMAND:
-            return tui_handle_command_input(key);
 
         default:
             return false;
@@ -196,7 +186,7 @@ static bool tui_handle_browse_input(int key) {
 
         case '\r':
         case '\n':
-            // Enter: Edit selected field
+            // Enter: Edit selected field (future enhancement)
             if (g_tui_state.table_expanded[g_tui_state.selected_table_idx]) {
                 // Get selected field
                 const table_meta_t* table = catalog_get_table_by_index(g_tui_state.selected_table_idx);
@@ -204,11 +194,8 @@ static bool tui_handle_browse_input(int key) {
                     const field_meta_t* field = catalog_get_field(table, g_tui_state.selected_field_idx);
 
                     if (field && field->access != FIELD_ACCESS_RO) {
-                        // Use command mode for editing (easier than inline editing)
-                        snprintf(g_tui_state.input_buf, sizeof(g_tui_state.input_buf),
-                                 "d t s %s.%s ", table->name, field->name);
-                        g_tui_state.input_len = strlen(g_tui_state.input_buf);
-                        g_tui_state.mode = TUI_MODE_COMMAND;
+                        snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                 "Editing not yet implemented");
                         g_tui_state.needs_refresh = true;
                     } else {
                         snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
@@ -217,15 +204,6 @@ static bool tui_handle_browse_input(int key) {
                     }
                 }
             }
-            return true;
-
-        case 'c':
-        case 'C':
-            // Enter command mode
-            g_tui_state.mode = TUI_MODE_COMMAND;
-            g_tui_state.input_len = 0;
-            memset(g_tui_state.input_buf, 0, sizeof(g_tui_state.input_buf));
-            g_tui_state.needs_refresh = true;
             return true;
 
         case 'r':
@@ -240,65 +218,6 @@ static bool tui_handle_browse_input(int key) {
             // Quit TUI
             tui_shutdown();
             return true;
-    }
-
-    return false;
-}
-
-static bool tui_handle_command_input(int key) {
-    switch (key) {
-        case 27:  // ESC
-            // Cancel command input
-            g_tui_state.mode = TUI_MODE_BROWSE;
-            g_tui_state.needs_refresh = true;
-            return true;
-
-        case '\r':
-        case '\n':
-            // Execute command
-            {
-                char output[512];
-                cmd_result_t result = cmd_execute(g_tui_state.input_buf, output, sizeof(output));
-
-                // Copy first line of output to status message
-                char* newline = strchr(output, '\n');
-                if (newline) {
-                    *newline = '\0';  // Truncate at first newline
-                }
-                strncpy(g_tui_state.status_msg, output, sizeof(g_tui_state.status_msg) - 1);
-                g_tui_state.status_msg[sizeof(g_tui_state.status_msg) - 1] = '\0';
-
-                // For multi-line output, print to console before returning to browse mode
-                if (strchr(output, '\0') + 1 < output + strlen(output)) {
-                    printf("%s\n", output);
-                    printf("\nPress any key to continue...");
-                    while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) {
-                        sleep_ms(10);
-                    }
-                }
-            }
-            g_tui_state.mode = TUI_MODE_BROWSE;
-            g_tui_state.needs_refresh = true;
-            return true;
-
-        case '\b':
-        case 127:  // Backspace/Delete
-            if (g_tui_state.input_len > 0) {
-                g_tui_state.input_len--;
-                g_tui_state.input_buf[g_tui_state.input_len] = '\0';
-                g_tui_state.needs_refresh = true;
-            }
-            return true;
-
-        default:
-            // Add character to input buffer
-            if (isprint(key) && g_tui_state.input_len < sizeof(g_tui_state.input_buf) - 1) {
-                g_tui_state.input_buf[g_tui_state.input_len++] = key;
-                g_tui_state.input_buf[g_tui_state.input_len] = '\0';
-                g_tui_state.needs_refresh = true;
-                return true;
-            }
-            break;
     }
 
     return false;
@@ -377,44 +296,8 @@ void tui_render_browse(void) {
     tui_print_status_bar(g_tui_state.status_msg);
 }
 
-void tui_render_command_palette(void) {
-    tui_clear_screen();
-
-    // Header
-    tui_print_header();
-
-    // Command prompt with visible cursor
-    printf("\n");
-    printf(ANSI_BOLD "Command Palette" ANSI_RESET "\n");
-    printf("\n");
-    printf(ANSI_FG_GREEN "> " ANSI_RESET "%s█", g_tui_state.input_buf);
-
-    // Show available tables
-    printf("\n\n");
-    printf(ANSI_DIM "Available Tables:" ANSI_RESET "\n");
-    uint8_t table_count = catalog_get_table_count();
-    for (uint8_t i = 0; i < table_count && i < 8; i++) {
-        const table_meta_t* table = catalog_get_table_by_index(i);
-        if (table) {
-            printf(ANSI_DIM "  %d. %-20s (%d fields)" ANSI_RESET "\n",
-                   table->id, table->name, table->field_count);
-        }
-    }
-
-    // Quick command hints
-    printf("\n");
-    printf(ANSI_DIM "Quick commands:" ANSI_RESET "\n");
-    printf(ANSI_DIM "  d t g <table>.<field>       - Get field value" ANSI_RESET "\n");
-    printf(ANSI_DIM "  d t s <table>.<field> <val> - Set field value" ANSI_RESET "\n");
-    printf(ANSI_DIM "  help, ?                     - Show all commands" ANSI_RESET "\n");
-    printf("\n");
-    printf(ANSI_DIM "ESC: Cancel | ENTER: Execute" ANSI_RESET "\n");
-
-    printf(ANSI_CURSOR_HIDE);  // Hide cursor again
-}
-
 void tui_render_field_edit(const void* table, const void* field) {
-    // Not implemented yet (Checkpoint 8.3)
+    // Not implemented yet (future enhancement)
 }
 
 // ============================================================================
@@ -453,18 +336,16 @@ void tui_print_header(void) {
 void tui_print_status_banner(void) {
     // TODO: Checkpoint 8.2 - get live values from wheel model
     // For now, show placeholder values
-    printf("Status: " ANSI_FG_GREEN "IDLE" ANSI_RESET);
-    printf(" │ Mode: " ANSI_DIM "OFF" ANSI_RESET);
-    printf(" │ RPM: " ANSI_DIM "0" ANSI_RESET);
-    printf(" │ Current: " ANSI_DIM "0.00A" ANSI_RESET);
-    printf(" │ Fault: " ANSI_DIM "-" ANSI_RESET);
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════════════════\n");
+    printf("Sts:" ANSI_FG_GREEN "IDLE" ANSI_RESET);
+    printf(" │ Md:" ANSI_DIM "OFF" ANSI_RESET);
+    printf(" │ RPM:" ANSI_DIM "0" ANSI_RESET);
+    printf(" │ I:" ANSI_DIM "0.00A" ANSI_RESET);
+    printf(" │ Flt:" ANSI_DIM "-" ANSI_RESET "\n");
+    printf("---\n");
 }
 
 void tui_print_status_bar(const char* message) {
-    printf("\n");
-    printf("───────────────────────────────────────────────────────────────────\n");
+    printf("\n---\n");
     if (message && message[0]) {
         printf(ANSI_FG_YELLOW "%s" ANSI_RESET "\n", message);
     }
@@ -473,11 +354,7 @@ void tui_print_status_bar(const char* message) {
 void tui_print_nav_hints(void) {
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
-            printf(ANSI_DIM "↑↓: Navigate  |  →: Expand  |  ←: Collapse  |  Enter: Edit  |  C: Command  |  Q: Quit" ANSI_RESET "\n");
-            break;
-
-        case TUI_MODE_COMMAND:
-            printf(ANSI_DIM "ESC: Cancel  |  ENTER: Execute" ANSI_RESET "\n");
+            printf(ANSI_DIM "↑↓:Nav →←:Exp/Col R:Refresh Q:Quit" ANSI_RESET "\n");
             break;
 
         default:

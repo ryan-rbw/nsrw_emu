@@ -27,7 +27,6 @@ add_executable(nrwa_t6_emulator
     # Console & TUI (Phase 8)
     console/tui.c
     console/tables.c
-    console/commands.c
     console/table_tests.c
     console/table_serial.c
     console/table_nsp.c
@@ -41,6 +40,20 @@ add_executable(nrwa_t6_emulator
 # Pass version string as compile definition
 target_compile_definitions(nrwa_t6_emulator PRIVATE
     FIRMWARE_VERSION="${GIT_VERSION}"
+)
+
+# Compiler optimizations for size reduction
+target_compile_options(nrwa_t6_emulator PRIVATE
+    -Os                      # Optimize for size
+    -fdata-sections          # Place data in separate sections
+    -ffunction-sections      # Place functions in separate sections
+    -fmerge-all-constants    # Merge duplicate string/constant literals
+)
+
+# Linker optimizations for size reduction
+target_link_options(nrwa_t6_emulator PRIVATE
+    -Wl,--gc-sections        # Remove unused sections
+    -Wl,--print-gc-sections  # Report removed sections
 )
 
 # Include directories

@@ -47,21 +47,12 @@ static void print_banner(void) {
     pico_unique_board_id_t board_id;
     pico_get_unique_board_id(&board_id);
 
-    printf("\n");
-    printf("╔════════════════════════════════════════════════════════════╗\n");
-    printf("║     NRWA-T6 Reaction Wheel Emulator                       ║\n");
-    printf("║     NewSpace Systems NRWA-T6 Compatible                   ║\n");
-    printf("╚════════════════════════════════════════════════════════════╝\n");
-    printf("\n");
-    printf("Firmware Version : %s\n", FIRMWARE_VERSION);
-    printf("Build Date       : %s %s\n", BUILD_DATE, BUILD_TIME);
-    printf("Target Platform  : RP2040 (Pico)\n");
-    printf("Board ID         : %02X%02X%02X%02X%02X%02X%02X%02X\n",
+    printf("\nNRWA-T6 Emulator %s\n", FIRMWARE_VERSION);
+    printf("NewSpace NRWA-T6 Compatible | RP2040\n");
+    printf("Board: %02X%02X%02X%02X%02X%02X%02X%02X\n",
            board_id.id[0], board_id.id[1], board_id.id[2], board_id.id[3],
            board_id.id[4], board_id.id[5], board_id.id[6], board_id.id[7]);
-    printf("\n");
-    printf("Status           : Initializing...\n");
-    printf("\n");
+    printf("Build: %s %s\n\n", BUILD_DATE, BUILD_TIME);
 }
 
 /**

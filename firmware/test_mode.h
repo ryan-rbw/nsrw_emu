@@ -230,7 +230,7 @@ void run_all_checkpoint_tests(void);
  */
 #define TEST_RESULT(name, passed) do { \
     bool _passed = (passed); \
-    printf("  %s: %s\n", (name), _passed ? "✓ PASS" : "✗ FAIL"); \
+    printf("  %s: %s\n", (name), _passed ? "OK" : "FAIL"); \
     test_record_result((name), _passed, 0); \
 } while(0)
 
@@ -238,7 +238,7 @@ void run_all_checkpoint_tests(void);
  * @brief Print test section header
  */
 #define TEST_SECTION(name) \
-    printf("\n=== %s ===\n", (name))
+    printf("\n%s\n", (name))
 
 /**
  * @brief Begin checkpoint test (with result recording)
@@ -246,9 +246,7 @@ void run_all_checkpoint_tests(void);
  * Usage: TEST_CHECKPOINT_BEGIN(3, 1, "CRC-CCITT");
  */
 #define TEST_CHECKPOINT_BEGIN(phase, cp, name) do { \
-    printf("\n╔════════════════════════════════════════════════════════════╗\n"); \
-    printf("║  CHECKPOINT %d.%d: %-42s║\n", (phase), (cp), (name)); \
-    printf("╚════════════════════════════════════════════════════════════╝\n"); \
+    printf("\n=== CP %d.%d: %s ===\n", (phase), (cp), (name)); \
     test_checkpoint_begin((phase), (cp), (name)); \
 } while(0)
 
@@ -257,7 +255,6 @@ void run_all_checkpoint_tests(void);
  */
 #define TEST_CHECKPOINT_END() do { \
     test_checkpoint_end(); \
-    printf("\n"); \
 } while(0)
 
 #endif // TEST_MODE_H

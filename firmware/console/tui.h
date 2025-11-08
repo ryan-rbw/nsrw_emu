@@ -70,7 +70,6 @@
  */
 typedef enum {
     TUI_MODE_BROWSE,        // Browse tables/fields with arrow keys
-    TUI_MODE_COMMAND,       // Command palette input (press 'C')
     TUI_MODE_EDIT,          // Edit field value (press Enter on field)
 } tui_mode_t;
 
@@ -147,7 +146,7 @@ void tui_shutdown(void);
  * │  │      ├─ parity     : NONE    (RO)         │  │
  * │  └────────────────────────────────────────────┘  │
  * ├───────────────────────────────────────────────────┤
- * │ ↑↓: Navigate │ →: Expand │ ←: Collapse │ C: Cmd │
+ * │ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Q: Quit│
  * └───────────────────────────────────────────────────┘
  *
  * Navigation:
@@ -155,21 +154,9 @@ void tui_shutdown(void);
  * - →: Expand selected table
  * - ←: Collapse expanded table
  * - Enter: Edit selected field
- * - C: Enter command mode
  * - Q: Quit
  */
 void tui_render_browse(void);
-
-/**
- * @brief Render command palette input
- *
- * Displays:
- * - Command prompt: "> "
- * - Input buffer with cursor
- * - Previous command results
- * - Available commands hint
- */
-void tui_render_command_palette(void);
 
 /**
  * @brief Render field edit dialog
