@@ -41,14 +41,14 @@ typedef struct {
 } fault_info_t;
 
 static const fault_info_t fault_table[] = {
-    [0] = {"Overspeed", true, true},         // FAULT_OVERSPEED (0x01)
-    [1] = {"Overvoltage", true, true},       // FAULT_OVERVOLTAGE (0x02)
-    [2] = {"Overcurrent", true, true},       // FAULT_OVERCURRENT (0x04)
-    [3] = {"Overpower", false, false},       // FAULT_OVERPOWER (0x08)
-    [4] = {"Undervoltage", false, false},    // FAULT_UNDERVOLTAGE (0x10)
-    [5] = {"Reserved", false, false},        // Reserved
-    [6] = {"Reserved", false, false},        // Reserved
-    [7] = {"Reserved", false, false},        // Reserved
+    [0] = {"Overvoltage", true, true},       // FAULT_OVERVOLTAGE (1 << 0)
+    [1] = {"Overspeed", true, true},         // FAULT_OVERSPEED (1 << 1)
+    [2] = {"Overduty", true, true},          // FAULT_OVERDUTY (1 << 2)
+    [3] = {"Overpower", false, false},       // FAULT_OVERPOWER (1 << 3)
+    [4] = {"Motor Overtemp", true, true},    // FAULT_MOTOR_OVERTEMP (1 << 4)
+    [5] = {"Electronics Overtemp", true, true},  // FAULT_ELECTRONICS_OVERTEMP (1 << 5)
+    [6] = {"Bearing Overtemp", true, true},  // FAULT_BEARING_OVERTEMP (1 << 6)
+    [7] = {"Comms Timeout", false, false},   // FAULT_COMMS_TIMEOUT (1 << 7)
 };
 
 // ============================================================================
