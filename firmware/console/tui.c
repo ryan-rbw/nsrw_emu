@@ -255,9 +255,8 @@ void tui_render_browse(void) {
             const char* cursor = is_selected ? ANSI_REVERSE ">" ANSI_RESET : " ";
             const char* expand_icon = g_tui_state.table_expanded[i] ? "▼" : "▶";
 
-            printf("%s %d. %s %s " ANSI_DIM "[%s]" ANSI_RESET "\n",
-                   cursor, i + 1, expand_icon, table->name,
-                   g_tui_state.table_expanded[i] ? "EXPANDED" : "COLLAPSED");
+            printf("%s %d. %s %s\n",
+                   cursor, i + 1, expand_icon, table->name);
 
             // Fields (if expanded)
             if (g_tui_state.table_expanded[i]) {
@@ -336,11 +335,11 @@ void tui_print_header(void) {
 void tui_print_status_banner(void) {
     // TODO: Checkpoint 8.2 - get live values from wheel model
     // For now, show placeholder values
-    printf("Sts:" ANSI_FG_GREEN "IDLE" ANSI_RESET);
-    printf(" │ Md:" ANSI_DIM "OFF" ANSI_RESET);
-    printf(" │ RPM:" ANSI_DIM "0" ANSI_RESET);
-    printf(" │ I:" ANSI_DIM "0.00A" ANSI_RESET);
-    printf(" │ Flt:" ANSI_DIM "-" ANSI_RESET "\n");
+    printf("Status: " ANSI_FG_GREEN "IDLE" ANSI_RESET);
+    printf(" │ Mode: " ANSI_DIM "OFF" ANSI_RESET);
+    printf(" │ RPM: " ANSI_DIM "0" ANSI_RESET);
+    printf(" │ Current: " ANSI_DIM "0.00A" ANSI_RESET);
+    printf(" │ Fault: " ANSI_DIM "-" ANSI_RESET "\n");
     printf("---\n");
 }
 
@@ -354,7 +353,7 @@ void tui_print_status_bar(const char* message) {
 void tui_print_nav_hints(void) {
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
-            printf(ANSI_DIM "↑↓:Nav →←:Exp/Col R:Refresh Q:Quit" ANSI_RESET "\n");
+            printf(ANSI_DIM "↑↓: Navigate | →: Expand | ←: Collapse | R: Refresh | Q: Quit" ANSI_RESET "\n");
             break;
 
         default:
