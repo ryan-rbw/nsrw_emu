@@ -227,6 +227,9 @@ static bool tui_handle_browse_input(int key) {
 // Rendering Functions
 // ============================================================================
 
+// Forward declaration
+static void format_field_display_name(const char* var_name, char* buf, size_t buflen);
+
 void tui_render_browse(void) {
     tui_clear_screen();
 
@@ -264,8 +267,12 @@ void tui_render_browse(void) {
                     const field_meta_t* field = catalog_get_field(table, j);
                     if (!field) continue;
 
-                    // Format value
+                    // Format display name and value
+                    char display_name[32];
                     char value_str[32];
+
+                    format_field_display_name(field->name, display_name, sizeof(display_name));
+
                     if (field->ptr) {
                         catalog_format_value(field, *field->ptr, value_str, sizeof(value_str));
                     } else {
@@ -277,9 +284,9 @@ void tui_render_browse(void) {
                                              (j == g_tui_state.selected_field_idx);
                     const char* field_cursor = is_field_selected ? ANSI_REVERSE "►" ANSI_RESET : " ";
 
-                    // Field line
-                    printf("  %s   ├─ %-18s : %-12s " ANSI_DIM "(%s)" ANSI_RESET "\n",
-                           field_cursor, field->name, value_str,
+                    // Field line: "Display Name (var_name) : value (RO)"
+                    printf("  %s   ├─ %s " ANSI_DIM "(%s)" ANSI_RESET " : %-12s " ANSI_DIM "(%s)" ANSI_RESET "\n",
+                           field_cursor, display_name, field->name, value_str,
                            field->access == FIELD_ACCESS_RO ? "RO" :
                            field->access == FIELD_ACCESS_WO ? "WO" : "RW");
                 }
@@ -364,6 +371,40 @@ void tui_print_nav_hints(void) {
 void tui_format_field_value(uint16_t field_id, uint32_t value, char* buf, size_t buflen) {
     // Simple formatter (will be enhanced in Checkpoint 8.2)
     snprintf(buf, buflen, "%lu", (unsigned long)value);
+}
+
+// ============================================================================
+// Field Name Formatting
+// ============================================================================
+
+/**
+ * @brief Convert snake_case to Title Case for display
+ *
+ * Examples:
+ *   "tx_count" → "TX Count"
+ *   "speed_rpm" → "Speed RPM"
+ *   "pid_kp" → "PID Kp"
+ */
+static void format_field_display_name(const char* var_name, char* buf, size_t buflen) {
+    size_t i = 0, j = 0;
+    bool new_word = true;
+
+    while (var_name[i] && j < buflen - 1) {
+        if (var_name[i] == '_') {
+            buf[j++] = ' ';
+            new_word = true;
+            i++;
+        } else {
+            if (new_word) {
+                buf[j++] = toupper(var_name[i]);
+                new_word = false;
+            } else {
+                buf[j++] = var_name[i];
+            }
+            i++;
+        }
+    }
+    buf[j] = '\0';
 }
 
 // ============================================================================
