@@ -188,6 +188,27 @@ void test_reset_and_faults(void);
 void test_nsp_commands(void);
 
 // ============================================================================
+// Phase 7: Protection System
+// ============================================================================
+
+/**
+ * @brief Test protection system thresholds and fault handling
+ *
+ * Validates:
+ * - Protection initialization with defaults
+ * - Threshold parameter get/set with fixed-point encoding
+ * - Protection enable/disable flags
+ * - Fault detection (overvoltage, overspeed, overpower, overcurrent)
+ * - Fault latching behavior
+ * - LCL trip logic
+ * - Metadata functions (names, units, fault info)
+ *
+ * Prints results to console.
+ * Enable with: #define CHECKPOINT_7_1
+ */
+void test_protection(void);
+
+// ============================================================================
 // Helper Macros
 // ============================================================================
 

@@ -6,6 +6,7 @@
 #include "test_mode.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "pico/time.h"
 
 // Include checkpoint-specific modules
@@ -19,6 +20,7 @@
 #include "nss_nrwa_t6_model.h" // Checkpoint 5.2
 #include "nss_nrwa_t6_commands.h" // Checkpoint 6.1
 #include "nss_nrwa_t6_telemetry.h" // Checkpoint 6.1
+#include "nss_nrwa_t6_protection.h" // Checkpoint 7.1
 
 // ============================================================================
 // Checkpoint 3.1: CRC-CCITT Test Vectors
@@ -2066,6 +2068,266 @@ void test_nsp_commands(void) {
         printf("✓✓✓ ALL NSP COMMAND TESTS PASSED ✓✓✓\n");
     } else {
         printf("✗✗✗ SOME NSP COMMAND TESTS FAILED ✗✗✗\n");
+    }
+    printf("\n");
+}
+
+// ============================================================================
+// Checkpoint 7.1: Protection System Test
+// ============================================================================
+
+/**
+ * @brief Test protection system thresholds and fault handling
+ *
+ * Validates protection parameter management, fault detection, and latching.
+ */
+void test_protection(void) {
+    TEST_SECTION("Checkpoint 7.1: Protection System Test");
+
+    bool all_passed = true;
+    wheel_state_t state;
+
+    // Test 1: Protection initialization with defaults
+    {
+        TEST_SECTION("Test 1: Protection initialization");
+        printf("Initializing wheel model with protection defaults...\n");
+
+        wheel_model_init(&state);
+
+        bool passed = (state.overvoltage_threshold_v == DEFAULT_OVERVOLTAGE_THRESHOLD_V) &&
+                      (state.overspeed_fault_rpm == DEFAULT_OVERSPEED_FAULT_RPM) &&
+                      (state.overspeed_soft_rpm == DEFAULT_OVERSPEED_SOFT_RPM) &&
+                      (state.motor_overpower_limit_w == DEFAULT_OVERPOWER_LIMIT_W) &&
+                      (state.soft_overcurrent_a == DEFAULT_SOFT_OVERCURRENT_A) &&
+                      (state.braking_load_setpoint_v == DEFAULT_BRAKING_LOAD_V) &&
+                      (state.max_duty_cycle_pct == DEFAULT_MAX_DUTY_CYCLE_PCT) &&
+                      (state.protection_enable == PROT_ENABLE_ALL);
+
+        printf("  Overvoltage threshold: %.1f V (expected %.1f)\n",
+               state.overvoltage_threshold_v, DEFAULT_OVERVOLTAGE_THRESHOLD_V);
+        printf("  Overspeed fault: %.0f RPM (expected %.0f)\n",
+               state.overspeed_fault_rpm, DEFAULT_OVERSPEED_FAULT_RPM);
+        printf("  Overpower limit: %.0f W (expected %.0f)\n",
+               state.motor_overpower_limit_w, DEFAULT_OVERPOWER_LIMIT_W);
+        printf("  Protection enable: 0x%08X (expected 0x%08X)\n",
+               state.protection_enable, PROT_ENABLE_ALL);
+
+        TEST_RESULT("Default thresholds loaded", passed);
+        if (!passed) all_passed = false;
+    }
+
+    // Test 2: Protection parameter set/get with fixed-point encoding
+    {
+        TEST_SECTION("Test 2: Protection parameter get/set");
+
+        // Test overvoltage threshold (UQ16.16)
+        printf("Testing OVERVOLTAGE_THRESHOLD (UQ16.16)...\n");
+        float new_voltage = 40.5f;
+        uint32_t voltage_fixed = float_to_uq16_16(new_voltage);
+        bool set_ok = protection_set_parameter(&state, PROT_PARAM_OVERVOLTAGE_THRESHOLD, voltage_fixed);
+
+        uint32_t readback_fixed;
+        bool get_ok = protection_get_parameter(&state, PROT_PARAM_OVERVOLTAGE_THRESHOLD, &readback_fixed);
+        float readback_float = uq16_16_to_float(readback_fixed);
+
+        bool voltage_test = set_ok && get_ok && (fabsf(readback_float - new_voltage) < 0.01f);
+        printf("  Set %.1f V → Readback %.1f V\n", new_voltage, readback_float);
+        TEST_RESULT("Overvoltage threshold set/get", voltage_test);
+        if (!voltage_test) all_passed = false;
+
+        // Test overspeed fault (UQ14.18)
+        printf("Testing OVERSPEED_FAULT_RPM (UQ14.18)...\n");
+        float new_speed = 7000.0f;
+        uint32_t speed_fixed = float_to_uq14_18(new_speed);
+        set_ok = protection_set_parameter(&state, PROT_PARAM_OVERSPEED_FAULT_RPM, speed_fixed);
+
+        get_ok = protection_get_parameter(&state, PROT_PARAM_OVERSPEED_FAULT_RPM, &readback_fixed);
+        readback_float = uq14_18_to_float(readback_fixed);
+
+        bool speed_test = set_ok && get_ok && (fabsf(readback_float - new_speed) < 1.0f);
+        printf("  Set %.0f RPM → Readback %.0f RPM\n", new_speed, readback_float);
+        TEST_RESULT("Overspeed fault set/get", speed_test);
+        if (!speed_test) all_passed = false;
+
+        // Test overpower limit (UQ18.14, milliwatts)
+        printf("Testing OVERPOWER_LIMIT_W (UQ18.14)...\n");
+        float new_power = 150.0f;  // Watts
+        uint32_t power_fixed = float_to_uq18_14(new_power * 1000.0f);  // Convert to mW
+        set_ok = protection_set_parameter(&state, PROT_PARAM_OVERPOWER_LIMIT_W, power_fixed);
+
+        get_ok = protection_get_parameter(&state, PROT_PARAM_OVERPOWER_LIMIT_W, &readback_fixed);
+        readback_float = uq18_14_to_float(readback_fixed) / 1000.0f;  // Convert from mW
+
+        bool power_test = set_ok && get_ok && (fabsf(readback_float - new_power) < 0.1f);
+        printf("  Set %.0f W → Readback %.0f W\n", new_power, readback_float);
+        TEST_RESULT("Overpower limit set/get", power_test);
+        if (!power_test) all_passed = false;
+    }
+
+    // Test 3: Protection enable/disable flags
+    {
+        TEST_SECTION("Test 3: Protection enable/disable");
+
+        wheel_model_init(&state);  // Reset to defaults
+
+        // Disable overvoltage protection
+        protection_set_enable(&state, PROT_ENABLE_OVERVOLTAGE, false);
+        bool disabled = !protection_is_enabled(&state, PROT_ENABLE_OVERVOLTAGE);
+        bool others_enabled = protection_is_enabled(&state, PROT_ENABLE_OVERSPEED);
+
+        printf("  Overvoltage disabled: %s\n", disabled ? "yes" : "no");
+        printf("  Overspeed still enabled: %s\n", others_enabled ? "yes" : "no");
+
+        // Re-enable overvoltage
+        protection_set_enable(&state, PROT_ENABLE_OVERVOLTAGE, true);
+        bool re_enabled = protection_is_enabled(&state, PROT_ENABLE_OVERVOLTAGE);
+
+        bool enable_test = disabled && others_enabled && re_enabled;
+        TEST_RESULT("Enable/disable flags", enable_test);
+        if (!enable_test) all_passed = false;
+    }
+
+    // Test 4: Overvoltage fault detection
+    {
+        TEST_SECTION("Test 4: Overvoltage fault detection");
+
+        wheel_model_init(&state);
+        printf("Testing overvoltage fault at %.1f V (threshold: %.1f V)...\n",
+               state.overvoltage_threshold_v + 1.0f, state.overvoltage_threshold_v);
+
+        // Simulate overvoltage condition
+        state.voltage_v = state.overvoltage_threshold_v + 1.0f;
+        wheel_model_tick(&state);
+
+        bool fault_detected = (state.fault_status & FAULT_OVERVOLTAGE) != 0;
+        bool fault_latched = (state.fault_latch & FAULT_OVERVOLTAGE) != 0;
+        bool lcl_tripped = wheel_model_is_lcl_tripped(&state);
+        bool motor_disabled = (state.current_out_a == 0.0f);
+
+        printf("  Fault status: 0x%08X\n", state.fault_status);
+        printf("  Fault latch: 0x%08X\n", state.fault_latch);
+        printf("  LCL tripped: %s\n", lcl_tripped ? "yes" : "no");
+        printf("  Motor disabled: %s\n", motor_disabled ? "yes" : "no");
+
+        bool overvoltage_test = fault_detected && fault_latched && lcl_tripped && motor_disabled;
+        TEST_RESULT("Overvoltage fault detection", overvoltage_test);
+        if (!overvoltage_test) all_passed = false;
+    }
+
+    // Test 5: Overspeed fault detection and latching
+    {
+        TEST_SECTION("Test 5: Overspeed fault detection");
+
+        wheel_model_init(&state);
+        printf("Testing overspeed fault at %.0f RPM (threshold: %.0f RPM)...\n",
+               state.overspeed_fault_rpm + 100.0f, state.overspeed_fault_rpm);
+
+        // Simulate overspeed condition
+        state.omega_rad_s = (state.overspeed_fault_rpm + 100.0f) * RPM_TO_RAD_S;
+        wheel_model_set_mode(&state, CONTROL_MODE_CURRENT);
+        wheel_model_set_current(&state, 0.0f);
+        wheel_model_tick(&state);
+
+        bool fault_detected = (state.fault_status & FAULT_OVERSPEED) != 0;
+        bool fault_latched = (state.fault_latch & FAULT_OVERSPEED) != 0;
+        bool lcl_tripped = wheel_model_is_lcl_tripped(&state);
+
+        printf("  Fault status: 0x%08X\n", state.fault_status);
+        printf("  Fault latch: 0x%08X\n", state.fault_latch);
+        printf("  LCL tripped: %s\n", lcl_tripped ? "yes" : "no");
+
+        bool overspeed_test = fault_detected && fault_latched && lcl_tripped;
+        TEST_RESULT("Overspeed fault detection", overspeed_test);
+        if (!overspeed_test) all_passed = false;
+    }
+
+    // Test 6: Soft overspeed warning (non-latching)
+    {
+        TEST_SECTION("Test 6: Soft overspeed warning");
+
+        wheel_model_init(&state);
+        printf("Testing soft overspeed at %.0f RPM (threshold: %.0f RPM)...\n",
+               state.overspeed_soft_rpm + 100.0f, state.overspeed_soft_rpm);
+
+        // Simulate soft overspeed condition (between soft and hard limits)
+        float soft_speed = state.overspeed_soft_rpm + 100.0f;
+        if (soft_speed < state.overspeed_fault_rpm) {
+            state.omega_rad_s = soft_speed * RPM_TO_RAD_S;
+            wheel_model_tick(&state);
+
+            bool warning_active = (state.warning_status & WARN_SOFT_OVERSPEED) != 0;
+            bool no_hard_fault = (state.fault_latch & FAULT_OVERSPEED) == 0;
+            bool no_lcl_trip = !wheel_model_is_lcl_tripped(&state);
+
+            printf("  Warning status: 0x%08X\n", state.warning_status);
+            printf("  Fault latch: 0x%08X\n", state.fault_latch);
+            printf("  LCL tripped: %s\n", no_lcl_trip ? "no (good)" : "yes (bad)");
+
+            bool soft_test = warning_active && no_hard_fault && no_lcl_trip;
+            TEST_RESULT("Soft overspeed warning", soft_test);
+            if (!soft_test) all_passed = false;
+        } else {
+            printf("  Skipped (soft limit >= hard limit)\n");
+            TEST_RESULT("Soft overspeed warning", true);
+        }
+    }
+
+    // Test 7: Metadata functions
+    {
+        TEST_SECTION("Test 7: Metadata functions");
+
+        const char* param_name = protection_get_param_name(PROT_PARAM_OVERVOLTAGE_THRESHOLD);
+        const char* param_units = protection_get_param_units(PROT_PARAM_OVERVOLTAGE_THRESHOLD);
+        const char* fault_name = protection_get_fault_name(FAULT_OVERSPEED);
+        bool is_latching = protection_is_latching_fault(FAULT_OVERSPEED);
+        bool trips_lcl = protection_trips_lcl(FAULT_OVERSPEED);
+
+        printf("  Parameter name: %s\n", param_name);
+        printf("  Parameter units: %s\n", param_units);
+        printf("  Fault name: %s\n", fault_name);
+        printf("  Is latching: %s\n", is_latching ? "yes" : "no");
+        printf("  Trips LCL: %s\n", trips_lcl ? "yes" : "no");
+
+        bool metadata_test = (strcmp(param_name, "Overvoltage Threshold") == 0) &&
+                             (strcmp(param_units, "V") == 0) &&
+                             (strcmp(fault_name, "Overspeed") == 0) &&
+                             is_latching && trips_lcl;
+
+        TEST_RESULT("Metadata functions", metadata_test);
+        if (!metadata_test) all_passed = false;
+    }
+
+    // Test 8: Restore defaults
+    {
+        TEST_SECTION("Test 8: Restore defaults");
+
+        // Modify some thresholds
+        protection_set_parameter(&state, PROT_PARAM_OVERVOLTAGE_THRESHOLD,
+                                 float_to_uq16_16(50.0f));
+        protection_set_parameter(&state, PROT_PARAM_OVERSPEED_FAULT_RPM,
+                                 float_to_uq14_18(8000.0f));
+
+        printf("  Modified thresholds, then restoring defaults...\n");
+        protection_restore_defaults(&state);
+
+        bool restored = (state.overvoltage_threshold_v == DEFAULT_OVERVOLTAGE_THRESHOLD_V) &&
+                        (state.overspeed_fault_rpm == DEFAULT_OVERSPEED_FAULT_RPM);
+
+        printf("  Overvoltage: %.1f V (expected %.1f)\n",
+               state.overvoltage_threshold_v, DEFAULT_OVERVOLTAGE_THRESHOLD_V);
+        printf("  Overspeed: %.0f RPM (expected %.0f)\n",
+               state.overspeed_fault_rpm, DEFAULT_OVERSPEED_FAULT_RPM);
+
+        TEST_RESULT("Restore defaults", restored);
+        if (!restored) all_passed = false;
+    }
+
+    // Final result
+    printf("\n");
+    if (all_passed) {
+        printf("✓✓✓ ALL PROTECTION TESTS PASSED ✓✓✓\n");
+    } else {
+        printf("✗✗✗ SOME PROTECTION TESTS FAILED ✗✗✗\n");
     }
     printf("\n");
 }

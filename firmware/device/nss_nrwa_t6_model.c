@@ -4,6 +4,7 @@
  */
 
 #include "nss_nrwa_t6_model.h"
+#include "nss_nrwa_t6_protection.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -306,27 +307,13 @@ void wheel_model_init(wheel_state_t* state) {
     state->mode = CONTROL_MODE_CURRENT;
     state->direction = DIRECTION_POSITIVE;
 
-    // Set default protection thresholds
-    state->overvoltage_threshold_v = DEFAULT_OVERVOLTAGE_V;
-    state->overspeed_fault_rpm = DEFAULT_OVERSPEED_FAULT_RPM;
-    state->overspeed_soft_rpm = DEFAULT_OVERSPEED_SOFT_RPM;
-    state->max_duty_cycle_pct = DEFAULT_MAX_DUTY_CYCLE;
-    state->motor_overpower_limit_w = DEFAULT_MOTOR_OVERPOWER_W;
-    state->soft_overcurrent_a = DEFAULT_SOFT_OVERCURRENT_A;
-    state->braking_load_setpoint_v = DEFAULT_BRAKING_LOAD_V;
+    // Initialize protection system with default thresholds
+    protection_init(state);
 
     // Set default PI parameters
     state->pi_kp = DEFAULT_PI_KP;
     state->pi_ki = DEFAULT_PI_KI;
     state->pi_i_max_a = DEFAULT_PI_I_MAX_A;
-
-    // Enable all protections by default
-    state->protection_enable = PROT_ENABLE_OVERVOLTAGE |
-                                PROT_ENABLE_OVERSPEED |
-                                PROT_ENABLE_OVERDUTY |
-                                PROT_ENABLE_OVERPOWER |
-                                PROT_ENABLE_SOFT_OVERCURR |
-                                PROT_ENABLE_SOFT_OVERSPEED;
 
     // Simulated bus voltage (constant for now)
     state->voltage_v = 28.0f;  // Typical 28V bus

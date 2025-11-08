@@ -56,6 +56,9 @@
   #define PROT_ENABLE_OVERPOWER       (1 << 3)
   #define PROT_ENABLE_SOFT_OVERCURR   (1 << 4)
   #define PROT_ENABLE_SOFT_OVERSPEED  (1 << 5)
+  #define PROT_ENABLE_ALL             (PROT_ENABLE_OVERVOLTAGE | PROT_ENABLE_OVERSPEED | \
+                                       PROT_ENABLE_OVERDUTY | PROT_ENABLE_OVERPOWER | \
+                                       PROT_ENABLE_SOFT_OVERCURR | PROT_ENABLE_SOFT_OVERSPEED)
 
 // ============================================================================
 // Control Registers (0x0200-0x02FF) - READ/WRITE

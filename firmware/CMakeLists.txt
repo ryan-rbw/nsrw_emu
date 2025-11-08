@@ -19,6 +19,8 @@ add_executable(nrwa_t6_emulator
     # Device commands & telemetry (Phase 6)
     device/nss_nrwa_t6_commands.c
     device/nss_nrwa_t6_telemetry.c
+    # Protection system (Phase 7)
+    device/nss_nrwa_t6_protection.c
     # Test mode
     test_mode.c
 )

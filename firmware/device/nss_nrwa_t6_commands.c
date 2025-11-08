@@ -6,6 +6,7 @@
 #include "nss_nrwa_t6_commands.h"
 #include "nss_nrwa_t6_regs.h"
 #include "nss_nrwa_t6_telemetry.h"
+#include "nss_nrwa_t6_protection.h"
 #include "fixedpoint.h"
 #include "unaligned.h"
 #include <string.h>
