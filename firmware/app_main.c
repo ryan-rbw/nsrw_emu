@@ -32,9 +32,10 @@
 #define CHECKPOINT_5_2  // Wheel Physics & Control Modes
 #define CHECKPOINT_5_3  // Reset and Fault Handling
 #define CHECKPOINT_6_1  // NSP Command Handlers
+#define CHECKPOINT_7_1  // Protection System
 
 // Test mode
-#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2) || defined(CHECKPOINT_5_3) || defined(CHECKPOINT_6_1)
+#if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2) || defined(CHECKPOINT_5_3) || defined(CHECKPOINT_6_1) || defined(CHECKPOINT_7_1)
 #include "test_mode.h"
 #endif
 
@@ -293,9 +294,30 @@ int main(void) {
     // ========================================================================
 
     // ========================================================================
+    // PHASE 7 CHECKPOINT TEST SUITE
+    // ========================================================================
+
+    // CHECKPOINT 7.1: Protection System Test
+    #ifdef CHECKPOINT_7_1
+    printf("\n");
+    printf("╔════════════════════════════════════════════════════════════╗\n");
+    printf("║  CHECKPOINT 7.1: PROTECTION SYSTEM                        ║\n");
+    printf("╚════════════════════════════════════════════════════════════╝\n");
+    printf("\n");
+    printf("NOTE: This test validates protection threshold management.\n");
+    printf("Tests include initialization, fixed-point encoding, fault detection,\n");
+    printf("latching behavior, LCL trip logic, and metadata functions.\n");
+    printf("\n");
+    test_protection();
+    printf("\n");
+    printf("--- Checkpoint 7.1 complete ---\n");
+    #endif
+    // ========================================================================
+
+    // ========================================================================
     // ALL CHECKPOINTS COMPLETE - HALT HERE
     // ========================================================================
-    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2) || defined(CHECKPOINT_5_3) || defined(CHECKPOINT_6_1)
+    #if defined(CHECKPOINT_3_1) || defined(CHECKPOINT_3_2) || defined(CHECKPOINT_3_3) || defined(CHECKPOINT_3_4) || defined(CHECKPOINT_4_1) || defined(CHECKPOINT_4_2) || defined(CHECKPOINT_5_1) || defined(CHECKPOINT_5_2) || defined(CHECKPOINT_5_3) || defined(CHECKPOINT_6_1) || defined(CHECKPOINT_7_1)
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════╗\n");
     printf("║  ALL CHECKPOINT TESTS COMPLETE                            ║\n");
