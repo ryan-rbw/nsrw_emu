@@ -1149,7 +1149,7 @@ docs/README.md: 82 lines (new)
 
 **Status**: Complete
 **Completed**: 2025-11-08
-**Commits**: `c776725`
+**Commits**: `c776725`, `dfe306f` (checkpoint 7.1 test integration)
 
 ### What We Built
 
