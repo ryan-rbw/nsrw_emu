@@ -7,7 +7,7 @@ High-fidelity emulator for the NewSpace Systems NRWA-T6 reaction wheel, targetin
 - **Protocol Perfect**: RS-485 with SLIP framing, NSP protocol, CCITT CRC matching ICD
 - **Real-time Physics**: 100 Hz control loop with reaction wheel dynamics simulation
 - **Dual-Core Architecture**: Core0 for comms, Core1 for physics (< 200µs jitter)
-- **Rich Console**: USB-CDC terminal with table/field catalog and command palette
+- **Rich Console**: USB-CDC terminal with arrow-key navigation and table/field catalog
 - **Fault Injection**: JSON-driven deterministic error scenarios
 - **Single Binary**: UF2 file for drag-and-drop programming
 
@@ -161,7 +161,7 @@ The TUI is a **non-scrolling, live-updating interface** like `top` or `htop` wit
 │   3. ▶ Dynamics            [COLLAPSED]                            │
 │                                                                   │
 ├───────────────────────────────────────────────────────────────────┤
-│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Enter: Edit │ C: Command│
+│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ R: Refresh │ Q: Quit   │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -170,34 +170,10 @@ The TUI is a **non-scrolling, live-updating interface** like `top` or `htop` wit
 - **↑/↓** - Move cursor between tables and fields
 - **→** - Expand selected table to show fields
 - **←** - Collapse expanded table
-- **Enter** - Edit selected field value (Phase 8.3)
-- **C** - Enter command mode
 - **R** - Force refresh
 - **Q** or **ESC** - Quit
 
-### Command Mode (Phase 8.3)
-
-Press **C** to enter command mode. Commands support **partial prefix matching**:
-
-**Examples:**
-```
-> d t l                              → database table list
-> db tab get control.mode            → get field value
-> d t s control.setpoint_rpm 5000    → set field value
-> def                                → show non-defaults
-> ?                                  → help
-```
-
-**Available Commands:**
-
-- `help`, `?` - Show available commands
-- `database` (`db`, `d`)
-  - `table list` - List all tables
-  - `table get <table>.<field>` - Read field value
-  - `table set <table>.<field> <value>` - Write field value
-  - `defaults` - Show non-default values
-- `version` - Firmware version and build info
-- `quit` - Exit TUI
+All field values are viewable in browse mode. Field editing and command interface are planned for future enhancement.
 
 ### RS-485 Communication
 
@@ -282,10 +258,10 @@ nsrw_emu/
 - [ ] Phase 10: Main Application & Dual-Core
 
 **Metrics**:
-- **Lines of Code**: ~12,900 (258% of target)
+- **Lines of Code**: ~11,300 (optimized from 12,900)
 - **Checkpoints Complete**: 18/~19 (95%)
 - **Unit Tests**: 46 tests (all passing, cached at boot)
-- **Flash Usage**: 252 KB / 256 KB (98%)
+- **Flash Usage**: 151 KB / 256 KB (59%)
 
 See [PROGRESS.md](PROGRESS.md) for detailed status and [IMP.md](IMP.md) for implementation plan.
 
@@ -355,4 +331,4 @@ This project follows the implementation plan in [IMP.md](IMP.md). Each phase has
 
 **Version**: 0.1.0
 **Last Updated**: 2025-11-08
-**Status**: Phase 8 Complete ✅ - Console & TUI with full table catalog and command palette
+**Status**: Phase 8 Complete ✅ - Console & TUI with table catalog (optimized: 151 KB / 59% flash)

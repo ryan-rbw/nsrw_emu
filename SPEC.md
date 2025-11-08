@@ -6,7 +6,7 @@ Emulate a NewSpace Systems NRWA‑T6 reaction wheel so that the OBC/GNC stack ca
 - Speak the same physical/data‑link and NSP protocol over RS‑485 with SLIP framing and CCITT CRC.
 - Implement command handling, telemetry, protection and fault semantics compatible with the NRWA‑T6 ICD.
 - Simulate realistic dynamics, limits, and timing for current, speed, and torque control modes, including soft/hard protections.
-- Provide a local terminal UI on USB‑CDC with drill‑down “tables” and fields for live status and control.
+- Provide a local terminal UI on USB‑CDC with arrow-key navigation of tables and fields for live status viewing.
 - Support deterministic error/fault injection via JSON scenarios, loadable at runtime from on‑board flash or over the console.
 - Build to a single UF2 for Raspberry Pi Pico (RP2040) using the Pico SDK (C/C++).
 
@@ -91,7 +91,7 @@ reaction-wheel-emulator/
 - `drivers/slip.c`: SLIP encode/decode with END/ESC and robust state machine.
 - `drivers/nsp.c`: Packetize/depacketize NSP, control byte, CRC, routing to command handlers.
 - `device/*`: Wheel state machine, control modes, protections, telemetry layout.
-- `console/*`: USB‑CDC TUI with table/field navigation, command palette, JSON loader.
+- `console/*`: USB‑CDC TUI with table/field navigation, metadata-driven catalog system.
 - `util/fixedpoint.h`: Helpers for UQ formats used by PEEK/POKE fields.
 - `tools/host_tester.py`: Sends NSP sequences to validate emulator behavior.
 - `tools/errorgen.py`: Builds JSON scenarios with timeline/probabilities.
@@ -154,7 +154,7 @@ Blocks: STANDARD, TEMPERATURES, VOLTAGES, CURRENTS, DIAGNOSTICS; sizes and field
 │   7. ▶ Config & JSON       [COLLAPSED]                            │
 │                                                                   │
 ├───────────────────────────────────────────────────────────────────┤
-│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Enter: Edit │ C: Command│
+│ ↑↓: Navigate │ →: Expand │ ←: Collapse │ R: Refresh │ Q: Quit   │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -163,8 +163,6 @@ Blocks: STANDARD, TEMPERATURES, VOLTAGES, CURRENTS, DIAGNOSTICS; sizes and field
 - **↑/↓** — Move cursor between tables/fields
 - **→** — Expand selected table (show fields)
 - **←** — Collapse expanded table
-- **Enter** — Edit selected field (prompts for new value)
-- **C** — Enter command mode (see §8A)
 - **R** — Force screen refresh
 - **Q** or **ESC** — Quit TUI
 
@@ -179,114 +177,29 @@ Blocks: STANDARD, TEMPERATURES, VOLTAGES, CURRENTS, DIAGNOSTICS; sizes and field
 7. **Telemetry Blocks** — Decoded STANDARD/TEMP/VOLT/CURR/DIAG
 8. **Config & JSON** — Scenarios, defaults, save/restore
 
-## 8A. Terminal Command Palette & “Database” Tables
+## 8A. Table Catalog Architecture
 
-The console exposes both a menu UI and a command palette for power users. The emulator maintains an internal “database” of tables and fields that map 1:1 to device registers, telemetry, driver stats, and emulator-only controls. All tables and fields are addressable by IDs and by stable string names.
+The console uses a metadata-driven table catalog system where all device state, telemetry, and configuration are organized into tables and fields.
 
 ### 8A.1 Concepts
 
-- **Table**: A named collection of fields (read-only, write-only, or read-write). Mirrors the sections in §8.
-- **Field**: A typed item with metadata: id, name, type, units, access, default, encoder/decoder.
-- **Catalog**: A runtime registry of all tables/fields. Used by the TUI and command palette.
-- **Change Tracker**: Tracks any field whose current value differs from its compiled default. Persists until “restore-defaults” or power cycle.
+- **Table**: A named collection of fields (read-only or read-write). Corresponds to the 8 tables listed in §8.3.
+- **Field**: A typed item with metadata: id, name, type, units, access level, default value, and data pointer.
+- **Catalog**: A runtime registry of all tables/fields accessible via arrow-key navigation in the TUI.
 
-### 8A.2 Command Mode
+### 8A.2 Table Catalog Structure
 
-Press **C** in browse mode to enter command mode. Commands support **partial prefix matching**:
+Each table contains fields with the following metadata:
 
-**Examples:**
+- `serial` (Table 2) — RS-485 status, tx/rx counts, errors, baud rate, SLIP frames, CRC errors
+- `nsp` (Table 3) — Last command/reply, poll flag, ACK bit, command statistics
+- `control` (Table 4) — Active mode, setpoint, direction, PWM duty, command source
+- `dynamics` (Table 5) — Speed (RPM), momentum, torque, current, power, losses, acceleration
+- `protections` (Table 6) — Voltage/speed/current/power thresholds, fault flags, warnings
+- `telemetry` (Table 7) — Decoded telemetry block values (temperature, voltage, current, RPM)
+- `config` (Table 8) — Scenario status, defaults tracking, JSON loaded state
 
-- `d t l` → `database table list`
-- `da t list` → `database table list`
-- `db tab get control.mode` → `database table get control.mode`
-- `d t s control.setpoint_rpm 5000` → `database table set control.setpoint_rpm 5000`
-- `def` → `database defaults`
-- `?` → `help`
-
-### 8A.3 Built-in Commands
-
-Commands are **case-insensitive** with **prefix matching**. Aliases shown in parentheses.
-
-**General:**
-
-- `help` or `?` — Show help (or `help <command>` for details)
-- `quit` (`q`, `exit`) — Exit TUI
-- `version` — Firmware version, build time, git describe
-- `uptime` — Milliseconds since boot
-
-**Database Commands:**
-
-- `database` (`db`, `d`)
-  - `table` (`t`, `tab`)
-    - `list` (`ls`, `l`) — List all tables with ID, name, brief
-    - `get <table>.<field>` (`g`) — Read field value (decoded units)
-    - `set <table>.<field> <value>` (`s`) — Write field (type validated)
-    - `describe <table>` (`desc`) — Show all fields in table
-  - `defaults` (`def`)
-    - `list` — Show non-default fields (change tracker)
-    - `restore [<table>|<table>.<field>]` — Reset to compiled defaults
-
-**Protocol Commands:**
-
-- `peek <addr> <len>` — Raw register read (hex output)
-- `poke <addr> <hex-bytes>` — Raw register write
-- `nsp stats` — NSP command counters
-- `serial stats` — UART/RS-485/SLIP stats
-
-**Scenario Commands:**
-
-- `scenario list` — List JSON scenarios in flash
-- `scenario load <name>` — Load and activate scenario
-- `scenario status` — Active scenario timers
-
-**Protection Commands:**
-
-- `protect enable <name>` — Enable soft protection
-- `protect disable <name>` — Disable soft protection
-- `fault clear [all|mask]` — Clear latched faults
-
-All commands return: `OK` or `ERR <code> <message>`.
-
-### 8A.4 Database Catalog Structure (Examples)
-
-- `serial` (Table 1)
-  - `status` (1.1, bool)
-  - `tx_count` (1.2, u32), `rx_count` (1.3, u32), `tx_errors` (1.4, u32), `rx_errors` (1.5, u32)
-  - `baud_kbps` (1.6, u16), `port_active` (1.7, enum A|B), `slip_ok` (1.8, u32), `crc_err` (1.9, u32)
-
-- `nsp` (Table 2)
-  - `last_cmd` (2.1, hex[...]), `last_reply` (2.2, hex[...])
-  - `poll_seen` (2.3, bool), `ack_bit` (2.4, bool), `cmd_stats` (2.5, struct), `seq_timing_ms` (2.6, u32)
-
-- `control` (Table 3)
-  - `mode` (3.1, enum), `setpoint` (3.2, fixed), `direction` (3.3, enum), `pwm_duty` (3.4, q8.8), `source` (3.5, enum)
-
-- `dynamics` (Table 4)
-  - `speed_rpm` (4.1, q14.18), `momentum_nms` (4.2, q18.14), `torque_mNm_cmd` (4.3, q18.14), `torque_mNm_out` (4.3b, q18.14)
-  - `current_a_cmd` (4.4, q18.14), `current_a_out` (4.4b, q18.14), `power_w` (4.5, q18.14)
-  - `loss_a` (4.6a, q18.14), `loss_b` (4.6b, q18.14), `loss_c` (4.6c, q18.14), `alpha_rad_s2` (4.7, q18.14)
-
-- `protections` (Table 5)
-  - thresholds and flags per §5.4
-
-- `telemetry` (Table 6)
-  - sub-blocks with decoded views
-
-- `config` (Table 7)
-  - scenario and defaults management
-
-### 8A.4 Non-default Tracking
-
-- Each field stores `compiled_default`, `current_value`, and a `dirty` bit.
-- On any successful `set`, the emulator updates `current_value` and toggles `dirty` when `current_value != compiled_default`.
-- `defaults list` prints a compact diff: `<table>.<field>: default=<X> current=<Y>`.
-- `defaults restore` clears `dirty`, writes `compiled_default` back to the active map, and emits a change event to NSP (if applicable).
-- The change tracker ignores read-only fields and transient counters unless explicitly opted-in.
-
-### 8A.5 Leaving the UI
-
-- `exit` / `quit` closes the console task gracefully, deinitializes USB-CDC, and returns to the run loop.
-- If `auto-reopen` is enabled (default), the device will re-enumerate the console on the next USB connect.
+All fields are browse-able via the TUI. Read-write fields can be modified via future command interface or NSP POKE commands.
 
 ## 9. Error/Fault Injection
 
