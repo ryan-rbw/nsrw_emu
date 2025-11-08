@@ -53,7 +53,6 @@ target_compile_options(nrwa_t6_emulator PRIVATE
 # Linker optimizations for size reduction
 target_link_options(nrwa_t6_emulator PRIVATE
     -Wl,--gc-sections        # Remove unused sections
-    -Wl,--print-gc-sections  # Report removed sections
 )
 
 # Include directories
