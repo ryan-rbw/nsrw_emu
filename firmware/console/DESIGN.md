@@ -11,6 +11,34 @@ The console TUI system is designed to be **completely modular** and **registrati
 3. **Metadata-Driven**: All table/field properties defined declaratively
 4. **Type-Safe**: Strong typing with runtime validation
 5. **Extensible**: New tables, fields, and types can be added independently
+6. **Fixed Console Width**: All output constrained to 80-character width
+
+## Console Configuration
+
+The console enforces a fixed width for all output, defined in `console_config.h`:
+
+```c
+#define CONSOLE_WIDTH 80  // Standard VT100 terminal width
+```
+
+**Key Features:**
+- All text, logos, banners, and UI elements must fit within `CONSOLE_WIDTH`
+- Logo is centered within console width
+- Header and status banners are padded to exactly 80 characters
+- Separator lines span full console width
+- Configurable for different terminal sizes (80/100/120 columns)
+
+**Why 80 Characters?**
+- Standard VT100/xterm terminal width
+- Universal compatibility with serial terminals
+- Optimal readability on embedded consoles
+- Historical standard for text-based interfaces
+
+**Formatting Utilities** (`console_format.c`):
+- `console_print_line(char)` - Draw horizontal line across full width
+- `console_print_centered(str)` - Center text within console width
+- `console_print_box_line(str)` - Print bordered line with padding
+- `console_center_padding(len)` - Calculate centering offset
 
 ## Architecture Overview
 

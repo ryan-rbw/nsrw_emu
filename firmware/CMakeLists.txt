@@ -27,6 +27,7 @@ add_executable(nrwa_t6_emulator
     # Console & TUI (Phase 8)
     console/tui.c
     console/tables.c
+    console/console_format.c
     console/table_tests.c
     console/table_serial.c
     console/table_nsp.c

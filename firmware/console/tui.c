@@ -9,6 +9,8 @@
 #include "tables.h"
 #include "test_results.h"
 #include "logo.h"
+#include "console_config.h"
+#include "console_format.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -316,45 +318,76 @@ void tui_cursor_pos(uint8_t row, uint8_t col) {
 void tui_print_header(void) {
     uint32_t uptime_ms = to_ms_since_boot(get_absolute_time()) - g_boot_time_ms;
     uint32_t uptime_sec = uptime_ms / 1000;
+    char header_buf[CONSOLE_WIDTH + 1];
 
-    // Print logo
+    // Print logo (centered)
     printf("%s", LOGO_ART);
 
-    // Print header info
-    printf(ANSI_BOLD ANSI_FG_CYAN "NRWA-T6 Emulator" ANSI_RESET);
-    printf("  |  ");
-    printf("Uptime: %02lu:%02lu:%02lu",
-           uptime_sec / 3600,
-           (uptime_sec % 3600) / 60,
-           uptime_sec % 60);
-    printf("  |  ");
+    // Format header info to fit exactly 80 characters
+    // Format: "NRWA-T6 Emulator    |    Uptime: HH:MM:SS    |    Tests: N/M ✓/✗"
+    int written = snprintf(header_buf, sizeof(header_buf),
+                           ANSI_BOLD ANSI_FG_CYAN "NRWA-T6 Emulator" ANSI_RESET
+                           "    |    "
+                           "Uptime: %02lu:%02lu:%02lu"
+                           "    |    "
+                           "Tests: %d/%d %s",
+                           uptime_sec / 3600,
+                           (uptime_sec % 3600) / 60,
+                           uptime_sec % 60,
+                           g_test_results.total_passed,
+                           g_test_results.total_tests,
+                           g_test_results.all_passed ? ANSI_FG_GREEN "✓" ANSI_RESET : ANSI_FG_RED "✗" ANSI_RESET);
 
-    // Test summary
-    printf("Tests: %d/%d",
-           g_test_results.total_passed, g_test_results.total_tests);
+    // Print header with padding to fill 80 characters
+    printf("%s", header_buf);
 
-    if (g_test_results.all_passed) {
-        printf(" " ANSI_FG_GREEN "✓" ANSI_RESET);
-    } else {
-        printf(" " ANSI_FG_RED "✗" ANSI_RESET);
+    // Calculate visible length (excluding ANSI codes)
+    // Approximate: count only printable characters
+    int visible_len = 16 + 8 + 23 + 8 + 10;  // Approximate without ANSI codes
+    int padding = CONSOLE_WIDTH - visible_len;
+    if (padding > 0) {
+        for (int i = 0; i < padding; i++) {
+            putchar(' ');
+        }
     }
 
     printf("\n");
 }
 
 void tui_print_status_banner(void) {
+    char status_buf[CONSOLE_WIDTH + 1];
+
+    // Draw separator line
+    console_print_line('-');
+
+    // Format status to fit exactly 80 characters
     // TODO: Checkpoint 8.2 - get live values from wheel model
-    // For now, show placeholder values
-    printf("Status: " ANSI_FG_GREEN "IDLE" ANSI_RESET);
-    printf(" │ Mode: " ANSI_DIM "OFF" ANSI_RESET);
-    printf(" │ RPM: " ANSI_DIM "0" ANSI_RESET);
-    printf(" │ Current: " ANSI_DIM "0.00A" ANSI_RESET);
-    printf(" │ Fault: " ANSI_DIM "-" ANSI_RESET "\n");
-    printf("---\n");
+    snprintf(status_buf, sizeof(status_buf),
+             "Status: " ANSI_FG_GREEN "IDLE" ANSI_RESET
+             " │ Mode: " ANSI_DIM "OFF" ANSI_RESET
+             " │ RPM: " ANSI_DIM "0" ANSI_RESET
+             " │ Current: " ANSI_DIM "0.00A" ANSI_RESET
+             " │ Fault: " ANSI_DIM "-" ANSI_RESET);
+
+    printf("%s", status_buf);
+
+    // Pad to console width
+    int visible_len = 49;  // Approximate visible length without ANSI codes
+    int padding = CONSOLE_WIDTH - visible_len;
+    if (padding > 0) {
+        for (int i = 0; i < padding; i++) {
+            putchar(' ');
+        }
+    }
+    printf("\n");
+
+    // Draw separator line
+    console_print_line('-');
 }
 
 void tui_print_status_bar(const char* message) {
-    printf("\n---\n");
+    printf("\n");
+    console_print_line('-');
     if (message && message[0]) {
         printf(ANSI_FG_YELLOW "%s" ANSI_RESET "\n", message);
     }
