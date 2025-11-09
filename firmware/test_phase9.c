@@ -7,6 +7,7 @@
 
 #include "config/scenario.h"
 #include "config/json_loader.h"
+#include "pico/stdlib.h"
 #include <stdio.h>
 #include <string.h>
 
