@@ -93,7 +93,7 @@ static const field_meta_t nsp_fields[] = {
 
 static const table_meta_t nsp_table = {
     .id = 3,
-    .name = "NSP Layer",
+    .name = "NSP Status",
     .description = "Last cmd/reply, poll, ack, stats",
     .fields = nsp_fields,
     .field_count = sizeof(nsp_fields) / sizeof(nsp_fields[0]),

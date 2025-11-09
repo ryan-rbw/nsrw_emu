@@ -53,7 +53,6 @@ The console TUI system is designed to be **completely modular** and **registrati
 
 Create a new file `console/table_<name>.c` (e.g., `table_serial.c`):
 
-```c
 #include "tables.h"
 #include "nss_nrwa_t6_model.h"  // For live value pointers
 #include <string.h>

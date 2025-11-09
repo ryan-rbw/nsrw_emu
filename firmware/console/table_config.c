@@ -71,7 +71,7 @@ static const field_meta_t config_fields[] = {
 
 static const table_meta_t config_table = {
     .id = 8,
-    .name = "Config & JSON",
+    .name = "Config Status",
     .description = "Scenarios, defaults, save/restore",
     .fields = config_fields,
     .field_count = sizeof(config_fields) / sizeof(config_fields[0]),

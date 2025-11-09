@@ -284,11 +284,9 @@ void tui_render_browse(void) {
                                              (j == g_tui_state.selected_field_idx);
                     const char* field_cursor = is_field_selected ? ANSI_REVERSE "►" ANSI_RESET : " ";
 
-                    // Field line: "Display Name (var_name) : value (RO)"
-                    printf("  %s   ├─ %s " ANSI_DIM "(%s)" ANSI_RESET " : %-12s " ANSI_DIM "(%s)" ANSI_RESET "\n",
-                           field_cursor, display_name, field->name, value_str,
-                           field->access == FIELD_ACCESS_RO ? "RO" :
-                           field->access == FIELD_ACCESS_WO ? "WO" : "RW");
+                    // Field line: "Display Name (var_name) : value"
+                    printf("  %s   ├─ %s " ANSI_DIM "(%s)" ANSI_RESET " : %s\n",
+                           field_cursor, display_name, field->name, value_str);
                 }
             }
         }

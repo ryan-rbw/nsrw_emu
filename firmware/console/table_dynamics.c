@@ -137,7 +137,7 @@ static const field_meta_t dynamics_fields[] = {
 
 static const table_meta_t dynamics_table = {
     .id = 5,
-    .name = "Dynamics",
+    .name = "Dynamics Status",
     .description = "Speed, momentum, torque, current, power",
     .fields = dynamics_fields,
     .field_count = sizeof(dynamics_fields) / sizeof(dynamics_fields[0]),

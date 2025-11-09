@@ -32,7 +32,8 @@ add_executable(nrwa_t6_emulator
     console/table_nsp.c
     console/table_control.c
     console/table_dynamics.c
-    console/table_protections.c
+    console/table_protection_limits.c
+    console/table_protection_status.c
     console/table_telemetry.c
     console/table_config.c
 )

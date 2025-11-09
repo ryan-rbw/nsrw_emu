@@ -1,11 +1,11 @@
 /**
- * @file table_protections.c
- * @brief Protections Table Implementation
+ * @file table_protection_limits.c
+ * @brief Protection Limits Table Implementation
  *
- * Table 6: Protections (thresholds, power limit, flags, clear)
+ * Table 6: Protection Limits (configurable thresholds - all RW)
  */
 
-#include "table_protections.h"
+#include "table_protection_limits.h"
 #include "tables.h"
 #include "../device/nss_nrwa_t6_regs.h"
 #include <stdio.h>
@@ -21,14 +21,12 @@ static volatile uint32_t prot_overcurr_a = 6000;          // 6A (mA)
 static volatile uint32_t prot_soft_overcurr_a = 5000;     // 5A (mA, soft)
 static volatile uint32_t prot_overpower_w = 100000;       // 100W (mW)
 static volatile uint32_t prot_max_duty_pct = 9785;        // 97.85% (× 100)
-static volatile uint32_t prot_flags = 0;                  // Fault flags
-static volatile uint32_t prot_warnings = 0;               // Warning flags
 
 // ============================================================================
 // Field Definitions
 // ============================================================================
 
-static const field_meta_t protections_fields[] = {
+static const field_meta_t protection_limits_fields[] = {
     {
         .id = 601,
         .name = "overvolt_v",
@@ -99,45 +97,25 @@ static const field_meta_t protections_fields[] = {
         .ptr = (volatile uint32_t*)&prot_max_duty_pct,
         .dirty = false,
     },
-    {
-        .id = 608,
-        .name = "fault_flags",
-        .type = FIELD_TYPE_HEX,
-        .units = "",
-        .access = FIELD_ACCESS_RO,
-        .default_val = 0,
-        .ptr = (volatile uint32_t*)&prot_flags,
-        .dirty = false,
-    },
-    {
-        .id = 609,
-        .name = "warning_flags",
-        .type = FIELD_TYPE_HEX,
-        .units = "",
-        .access = FIELD_ACCESS_RO,
-        .default_val = 0,
-        .ptr = (volatile uint32_t*)&prot_warnings,
-        .dirty = false,
-    },
 };
 
 // ============================================================================
 // Table Definition
 // ============================================================================
 
-static const table_meta_t protections_table = {
+static const table_meta_t protection_limits_table = {
     .id = 6,
-    .name = "Protections",
-    .description = "Thresholds, power limit, flags",
-    .fields = protections_fields,
-    .field_count = sizeof(protections_fields) / sizeof(protections_fields[0]),
+    .name = "Protection Limits",
+    .description = "Configurable thresholds",
+    .fields = protection_limits_fields,
+    .field_count = sizeof(protection_limits_fields) / sizeof(protection_limits_fields[0]),
 };
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
-void table_protections_init(void) {
+void table_protection_limits_init(void) {
     // Register table with catalog
-    catalog_register_table(&protections_table);
+    catalog_register_table(&protection_limits_table);
 }

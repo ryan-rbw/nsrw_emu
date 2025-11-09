@@ -12,7 +12,8 @@
 #include "table_nsp.h"
 #include "table_control.h"
 #include "table_dynamics.h"
-#include "table_protections.h"
+#include "table_protection_limits.h"
+#include "table_protection_status.h"
 #include "table_telemetry.h"
 #include "table_config.h"
 #include <string.h>
@@ -42,7 +43,8 @@ void catalog_init(void) {
     table_nsp_init();
     table_control_init();
     table_dynamics_init();
-    table_protections_init();
+    table_protection_limits_init();
+    table_protection_status_init();
     table_telemetry_init();
     table_config_init();
 

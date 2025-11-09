@@ -71,7 +71,7 @@ static const field_meta_t test_fields[] = {
 
 static const table_meta_t test_table = {
     .id = 1,
-    .name = "Built-In Tests",
+    .name = "Test Results Status",
     .description = "Boot-time checkpoint test results",
     .fields = test_fields,
     .field_count = sizeof(test_fields) / sizeof(test_fields[0]),

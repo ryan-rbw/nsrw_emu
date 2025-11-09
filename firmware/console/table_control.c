@@ -94,7 +94,7 @@ static const field_meta_t control_fields[] = {
 
 static const table_meta_t control_table = {
     .id = 4,
-    .name = "Control Mode",
+    .name = "Control Setpoints",
     .description = "Mode, setpoint, direction, PWM",
     .fields = control_fields,
     .field_count = sizeof(control_fields) / sizeof(control_fields[0]),

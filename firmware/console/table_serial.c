@@ -115,7 +115,7 @@ static const field_meta_t serial_fields[] = {
 
 static const table_meta_t serial_table = {
     .id = 2,
-    .name = "Serial Interface",
+    .name = "Serial Status",
     .description = "RS-485, SLIP, CRC statistics",
     .fields = serial_fields,
     .field_count = sizeof(serial_fields) / sizeof(serial_fields[0]),

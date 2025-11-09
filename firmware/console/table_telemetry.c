@@ -93,7 +93,7 @@ static const field_meta_t telemetry_fields[] = {
 
 static const table_meta_t telemetry_table = {
     .id = 7,
-    .name = "Telemetry Blocks",
+    .name = "Telemetry Status",
     .description = "Decoded telemetry (STANDARD/TEMP/VOLT/CURR)",
     .fields = telemetry_fields,
     .field_count = sizeof(telemetry_fields) / sizeof(telemetry_fields[0]),
