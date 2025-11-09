@@ -168,14 +168,19 @@ Blocks: STANDARD, TEMPERATURES, VOLTAGES, CURRENTS, DIAGNOSTICS; sizes and field
 
 ### 8.3 Tables
 
-1. **Built-In Tests** — Boot-time checkpoint test results (total, passed, failed, duration)
-2. **Serial Interface** — Status, tx/rx counts, errors, baud, port, SLIP, CRC
-3. **NSP Layer** — Last cmd/reply, poll, ack, command stats, timing
-4. **Control Mode** — Active mode, setpoint, direction, PWM, source
-5. **Dynamics** — Speed, momentum, torque, current, power, losses, α
-6. **Protections** — Thresholds, power limit, flags, clear faults
-7. **Telemetry Blocks** — Decoded STANDARD/TEMP/VOLT/CURR/DIAG
-8. **Config & JSON** — Scenarios, defaults, save/restore
+Tables are organized by access type: **Control** (read-write) and **Status** (read-only).
+
+1. **Test Results Status** — Boot-time checkpoint test results (total, passed, failed, duration)
+2. **Serial Status** — RS-485 status, tx/rx counts, errors, baud, port, SLIP, CRC
+3. **NSP Status** — Last cmd/reply, poll, ack, command stats, timing
+4. **Control Setpoints** — Mode, speed, current, torque, PWM, direction (all read-write)
+5. **Dynamics Status** — Speed, momentum, torque, current, power, losses, α
+6. **Protection Limits** — Configurable thresholds (overvolt, overspeed, overcurrent, etc.)
+7. **Protection Status** — Fault flags, warning flags
+8. **Telemetry Status** — Decoded STANDARD/TEMP/VOLT/CURR/DIAG blocks
+9. **Config Status** — Scenarios, defaults, save/restore
+
+Access type is implicit from table name - no per-field RO/RW labels needed.
 
 ## 8A. Table Catalog Architecture
 
@@ -183,7 +188,7 @@ The console uses a metadata-driven table catalog system where all device state, 
 
 ### 8A.1 Concepts
 
-- **Table**: A named collection of fields (read-only or read-write). Corresponds to the 8 tables listed in §8.3.
+- **Table**: A named collection of fields with consistent access type (Control or Status). Corresponds to the 9 tables listed in §8.3.
 - **Field**: A typed item with metadata: id, name, type, units, access level, default value, and data pointer.
 - **Catalog**: A runtime registry of all tables/fields accessible via arrow-key navigation in the TUI.
 
@@ -191,15 +196,17 @@ The console uses a metadata-driven table catalog system where all device state, 
 
 Each table contains fields with the following metadata:
 
-- `serial` (Table 2) — RS-485 status, tx/rx counts, errors, baud rate, SLIP frames, CRC errors
-- `nsp` (Table 3) — Last command/reply, poll flag, ACK bit, command statistics
-- `control` (Table 4) — Active mode, setpoint, direction, PWM duty, command source
-- `dynamics` (Table 5) — Speed (RPM), momentum, torque, current, power, losses, acceleration
-- `protections` (Table 6) — Voltage/speed/current/power thresholds, fault flags, warnings
-- `telemetry` (Table 7) — Decoded telemetry block values (temperature, voltage, current, RPM)
-- `config` (Table 8) — Scenario status, defaults tracking, JSON loaded state
+- `tests` (Table 1) — Test Results Status: total tests, passed, failed, duration
+- `serial` (Table 2) — Serial Status: RS-485 status, tx/rx counts, errors, baud rate, SLIP frames, CRC errors
+- `nsp` (Table 3) — NSP Status: Last command/reply, poll flag, ACK bit, command statistics
+- `control` (Table 4) — Control Setpoints: Mode, speed, current, torque, PWM, direction (all RW)
+- `dynamics` (Table 5) — Dynamics Status: Speed (RPM), momentum, torque, current, power, losses, acceleration
+- `protection_limits` (Table 6) — Protection Limits: Configurable thresholds (all RW)
+- `protection_status` (Table 7) — Protection Status: Fault flags, warning flags (all RO)
+- `telemetry` (Table 8) — Telemetry Status: Decoded telemetry block values (temperature, voltage, current, RPM)
+- `config` (Table 9) — Config Status: Scenario status, defaults tracking, JSON loaded state
 
-All fields are browse-able via the TUI. Read-write fields can be modified via future command interface or NSP POKE commands.
+All fields are browse-able via the TUI. Control tables (with RW fields) can be modified via future command interface or NSP POKE commands. Access type is implicit from table name.
 
 ## 9. Error/Fault Injection
 

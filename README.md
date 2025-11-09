@@ -152,13 +152,14 @@ The TUI is a **non-scrolling, live-updating interface** like `top` or `htop` wit
 ├───────────────────────────────────────────────────────────────────┤
 │ TABLES                                                            │
 │                                                                   │
-│ > 1. ▶ Built-In Tests      [COLLAPSED]                           │
-│   2. ▼ Control Mode        [EXPANDED]                            │
-│       ├─ mode          : SPEED       (RW)                         │
-│     ► ├─ setpoint_rpm  : 3000        (RW)    ← cursor            │
-│       ├─ actual_rpm    : 3245        (RO)                         │
-│       └─ pid_enabled   : true        (RW)                         │
-│   3. ▶ Dynamics            [COLLAPSED]                            │
+│ > 1. ▶ Test Results Status                                        │
+│   2. ▼ Control Setpoints                                          │
+│       ├─ Mode (mode)                : SPEED                       │
+│     ► ├─ Speed RPM (speed_rpm)      : 3000        ← cursor       │
+│       ├─ Current MA (current_ma)    : 0                           │
+│       ├─ Torque MNM (torque_mnm)    : 0                           │
+│       └─ PWM Pct (pwm_pct)          : 0                           │
+│   3. ▶ Dynamics Status                                            │
 │                                                                   │
 ├───────────────────────────────────────────────────────────────────┤
 │ ↑↓: Navigate │ →: Expand │ ←: Collapse │ R: Refresh │ Q: Quit   │

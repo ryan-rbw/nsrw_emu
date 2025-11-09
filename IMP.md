@@ -712,12 +712,12 @@ Each field encoded in UQ format per ICD
 ├───────────────────────────────────────────────────────────────────┤
 │ TABLES                                                            │
 │                                                                   │
-│ > 1. ▶ Built-In Tests      [COLLAPSED]                           │
-│   2. ▼ Control Mode        [EXPANDED]                            │
-│       ├─ mode          : SPEED       (RW)                         │
-│     ► ├─ setpoint_rpm  : 3000        (RW)                         │
-│       ├─ actual_rpm    : 3245        (RO)                         │
-│   3. ▶ Dynamics            [COLLAPSED]                            │
+│ > 1. ▶ Test Results Status                                        │
+│   2. ▼ Control Setpoints                                          │
+│       ├─ Mode (mode)                : SPEED                       │
+│     ► ├─ Speed RPM (speed_rpm)      : 3000                        │
+│       ├─ Current MA (current_ma)    : 0                           │
+│   3. ▶ Dynamics Status                                            │
 │                                                                   │
 ├───────────────────────────────────────────────────────────────────┤
 │ ↑↓: Navigate │ →: Expand │ ←: Collapse │ Enter: Edit │ C: Command│
@@ -778,8 +778,9 @@ Each field encoded in UQ format per ICD
 **Acceptance**:
 - Navigate to Dynamics table with arrow keys
 - Expand/collapse tables with →/← keys
-- All 8 tables visible with field counts
-- Field values display with proper units and RO/RW indicators
+- All 9 tables visible with field counts
+- Field values display with proper units and human-readable names
+- Tables organized by access type (Control vs Status)
 - TUI refreshes without flicker
 
 ---
