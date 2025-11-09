@@ -3,7 +3,7 @@
 **Project**: Reaction Wheel Emulator for NewSpace Systems NRWA-T6
 **Platform**: Raspberry Pi Pico (RP2040)
 **Started**: 2025-11-05
-**Last Updated**: 2025-11-08
+**Last Updated**: 2025-11-09
 
 ---
 
@@ -18,7 +18,7 @@
 | Phase 5: Device Model | ✅ Complete | 100% | Register map ✅, physics ✅, reset handling ✅ |
 | Phase 6: Commands & Telemetry | ✅ Complete | 100% | NSP handlers ✅, PEEK/POKE ✅ - HW validated |
 | Phase 7: Protection System | ✅ Complete | 100% | Thresholds ✅, fault handling ✅ - HW validated |
-| Phase 8: Console & TUI | ✅ Complete | 100% | TUI core, 8 tables, optimized (151 KB) |
+| Phase 8: Console & TUI | ✅ Complete | 100% | TUI, 8 tables, field editing, logo (85 KB) |
 | Phase 9: Fault Injection | 🔄 Next | 0% | JSON scenarios |
 | Phase 10: Integration | ⏸️ Pending | 0% | Dual-core orchestration |
 
@@ -1683,13 +1683,18 @@ Focus shifted to clean arrow-key navigation model.
 - ✅ Test caching (46 tests, all passing)
 - ✅ Modular table registration
 - ✅ Optimized to 151 KB (40% size reduction)
+- ✅ Company logo integration (NewSpace Systems ASCII art)
+- ✅ 80-character console width standardization
+- ✅ Field editing for RW (read-write) control fields
+- ✅ Console formatting utilities (centering, padding, box drawing)
 
 ### Phase 8 Files Summary
 
-**Created**: 27 files (after optimization)
+**Created**: 31 files (after optimization + enhancements)
 
 - 16 table files (.c/.h pairs for 8 tables)
 - 4 TUI core files (tui, tables, test_results)
+- 4 console infrastructure files (logo, console_config, console_format .h/.c)
 - 1 design doc (DESIGN.md)
 
 **Removed during optimization**:
@@ -1699,10 +1704,58 @@ Focus shifted to clean arrow-key navigation model.
 
 **Modified**: 5 files
 
-- app_main.c (startup banner optimized)
-- CMakeLists.txt (size optimizations added)
+- app_main.c (startup banner optimized, logo added)
+- CMakeLists.txt (size optimizations added, console_format.c added)
 - test_mode.h (simplified output macros)
-- tui.c/h (command mode removed)
+- tui.c/h (command mode removed, field editing added)
+
+### Phase 8 Final Enhancements (2025-11-09)
+
+**Company Logo Integration** (`3bfe944`, `4623213`):
+- Created [firmware/console/logo.h](firmware/console/logo.h) with NewSpace Systems ASCII art (18 lines)
+- Integrated logo in both boot banner and TUI header refresh
+- Logo displays on every screen update for consistent branding
+
+**80-Character Console Width Standardization** (`3bfe944`):
+- Created [firmware/console/console_config.h](firmware/console/console_config.h) - Console configuration constants
+  - `CONSOLE_WIDTH 80` (VT100 standard, configurable)
+  - `CONSOLE_HEIGHT 24`
+  - Table formatting constants
+- Created [firmware/console/console_format.h/.c](firmware/console/console_format.c) - Formatting utilities
+  - `console_print_line(char)` - Draw separator lines across full width
+  - `console_print_centered(str)` - Center text within console width
+  - `console_print_box_line(str)` - Bordered box lines with padding
+  - `console_center_padding(len)` - Calculate centering offset
+- Updated TUI to use 80-character width for all elements:
+  - Header padded to exactly 80 characters
+  - Status banner aligned to 80 characters
+  - Separator lines span full width
+  - All text elements fit within width constraint
+- Updated [firmware/console/DESIGN.md](firmware/console/DESIGN.md) with console configuration documentation
+
+**Field Editing Support** (`4623213`):
+- Implemented interactive editing for RW (read-write) fields in Control tables
+- Added TUI_MODE_EDIT state machine:
+  - Enter key on RW field → Edit mode
+  - ESC → Cancel and return to browse
+  - Enter → Parse and save value
+- Input handling:
+  - Numeric input (0-9, +, -)
+  - Backspace support
+  - Integer parsing with `strtol()` validation
+  - Visual feedback with input buffer + cursor in status bar
+- Error handling:
+  - Prevents editing read-only fields
+  - Validates numeric input
+  - Shows confirmation/error messages
+- Added `#include <stdlib.h>` for standard library functions
+
+**UI Polish**:
+- Improved navigation hint spacing: `↑↓ : Navigate` (space before colon)
+- Consistent formatting across all UI elements
+- Professional appearance matching industry-standard terminals
+
+**Final Flash Usage**: 85,124 bytes (33% of 256 KB)
 
 ### What's Next After Phase 8
 
@@ -1718,14 +1771,14 @@ Focus shifted to clean arrow-key navigation model.
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
-| Lines of Code (C) | ~12,900 | 3000-5000 | 258% ✅ |
+| Lines of Code (C) | ~13,100 | 3000-5000 | 262% ✅ |
 | Phases Complete | 8 | 10 | 80% |
 | Checkpoints Complete | 18 | ~19 | 95% |
 | Current Phase | Phase 8 | Phase 10 | Phase 8 complete ✅ |
 | Unit Tests | 46 tests | TBD | Phase 3+4+5+6+7 (all pass) |
 | Test Coverage | N/A | ≥80% | - |
 | Build Time | ~20s | <30s | ✅ |
-| Flash Usage | 252 KB | <256 KB | 98% |
+| Flash Usage | 85 KB | <256 KB | 33% ✅ |
 
 ---
 

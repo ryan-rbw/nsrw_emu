@@ -488,7 +488,7 @@ void tui_print_status_bar(const char* message) {
 void tui_print_nav_hints(void) {
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
-            printf(ANSI_DIM "↑↓: Navigate | →: Expand | ←: Collapse | R: Refresh | Q: Quit" ANSI_RESET "\n");
+            printf(ANSI_DIM "↑↓ : Navigate | → : Expand | ← : Collapse | R : Refresh | Q : Quit" ANSI_RESET "\n");
             break;
 
         default:
