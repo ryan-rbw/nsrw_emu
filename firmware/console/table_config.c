@@ -36,6 +36,8 @@ static const field_meta_t config_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)cfg_scenario_name,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 902,
@@ -46,6 +48,8 @@ static const field_meta_t config_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&cfg_scenario_loaded,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 903,
@@ -56,6 +60,8 @@ static const field_meta_t config_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&cfg_scenario_active,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 904,
@@ -66,6 +72,8 @@ static const field_meta_t config_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&cfg_scenario_elapsed_ms,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 905,
@@ -76,6 +84,8 @@ static const field_meta_t config_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&cfg_scenario_events_triggered,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 906,
@@ -86,6 +96,8 @@ static const field_meta_t config_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&cfg_scenario_events_total,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 

@@ -11,6 +11,7 @@
 #include "logo.h"
 #include "console_config.h"
 #include "console_format.h"
+#include "table_control.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -207,8 +208,15 @@ static bool tui_handle_browse_input(int key) {
                         g_tui_state.mode = TUI_MODE_EDIT;
                         g_tui_state.input_len = 0;
                         g_tui_state.input_buf[0] = '\0';
-                        snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
-                                 "Enter new value (ESC to cancel): ");
+
+                        // Show hint for ENUM and BOOL fields that "?" is available
+                        if (field->type == FIELD_TYPE_ENUM || field->type == FIELD_TYPE_BOOL) {
+                            snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                     "Enter new value (? for help, ESC to cancel): ");
+                        } else {
+                            snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                     "Enter new value (ESC to cancel): ");
+                        }
                         g_tui_state.needs_refresh = true;
                     } else {
                         snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
@@ -264,23 +272,50 @@ static bool tui_handle_edit_input(int key) {
                 // Parse and write value
                 g_tui_state.input_buf[g_tui_state.input_len] = '\0';
 
-                // Simple integer parsing for now
-                char* endptr;
-                long value = strtol(g_tui_state.input_buf, &endptr, 10);
+                // Special case: "?" for ENUM and BOOL fields shows help
+                if (strcmp(g_tui_state.input_buf, "?") == 0) {
+                    if (field->type == FIELD_TYPE_ENUM) {
+                        // Display enum help
+                        printf("\nAvailable values for %s:\n", field->name);
+                        if (field->enum_values) {
+                            for (uint8_t i = 0; i < field->enum_count; i++) {
+                                printf("  %d: %s\n", i, field->enum_values[i]);
+                            }
+                        }
+                    } else if (field->type == FIELD_TYPE_BOOL) {
+                        // Display bool help
+                        printf("\nAvailable values for %s:\n", field->name);
+                        printf("  0: FALSE (or false, no)\n");
+                        printf("  1: TRUE (or true, yes)\n");
+                    }
+                    printf("\nPress any key to continue editing...");
+                    getchar_timeout_us(5000000);  // Wait for keypress
+                    g_tui_state.input_len = 0;
+                    g_tui_state.input_buf[0] = '\0';
+                    g_tui_state.needs_refresh = true;
+                    return true;
+                }
 
-                if (endptr != g_tui_state.input_buf && *endptr == '\0') {
-                    // Valid number - write to field
+                // Use type-aware parsing
+                uint32_t value;
+                if (catalog_parse_value(field, g_tui_state.input_buf, &value)) {
+                    // Valid value - write to field
                     if (field->ptr) {
-                        *(volatile uint32_t*)field->ptr = (uint32_t)value;
+                        *(volatile uint32_t*)field->ptr = value;
+
+                        // Format value for display
+                        char value_str[32];
+                        catalog_format_value(field, value, value_str, sizeof(value_str));
+
                         snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
-                                 "Saved: %s = %ld", field->name, value);
+                                 "Saved: %s = %s", field->name, value_str);
                     } else {
                         snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
                                  "Error: No pointer for field");
                     }
                 } else {
                     snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
-                             "Error: Invalid number");
+                             "Error: Invalid value. Type '?' for help.");
                 }
             }
             g_tui_state.mode = TUI_MODE_BROWSE;
@@ -297,14 +332,26 @@ static bool tui_handle_edit_input(int key) {
             return true;
 
         default:
-            // Accept printable characters (digits, +, -)
-            if ((key >= '0' && key <= '9') || key == '-' || key == '+') {
-                if (g_tui_state.input_len < sizeof(g_tui_state.input_buf) - 1) {
+            // Accept printable characters
+            // For ENUM/BOOL fields: letters, digits, underscore, question mark
+            // For numeric fields: digits, +, -, .
+            if (isprint(key)) {
+                bool accept = false;
+
+                if (field->type == FIELD_TYPE_ENUM || field->type == FIELD_TYPE_BOOL) {
+                    // ENUM/BOOL: Accept letters (for string names), digits, underscore, ?
+                    accept = isalnum(key) || key == '_' || key == '?';
+                } else {
+                    // Numeric: Accept digits, +, -, .
+                    accept = isdigit(key) || key == '-' || key == '+' || key == '.';
+                }
+
+                if (accept && g_tui_state.input_len < sizeof(g_tui_state.input_buf) - 1) {
                     g_tui_state.input_buf[g_tui_state.input_len++] = (char)key;
                     g_tui_state.input_buf[g_tui_state.input_len] = '\0';
                     g_tui_state.needs_refresh = true;
+                    return true;
                 }
-                return true;
             }
             break;
     }
@@ -347,7 +394,7 @@ void tui_render_browse(void) {
             const char* cursor = is_selected ? ANSI_REVERSE ">" ANSI_RESET : " ";
             const char* expand_icon = g_tui_state.table_expanded[i] ? "▼" : "▶";
 
-            printf("%s %d. %s %s\n",
+            printf("%s %2d. %s %s\n",
                    cursor, i + 1, expand_icon, table->name);
 
             // Fields (if expanded)
@@ -363,7 +410,12 @@ void tui_render_browse(void) {
                     format_field_display_name(field->name, display_name, sizeof(display_name));
 
                     if (field->ptr) {
-                        catalog_format_value(field, *field->ptr, value_str, sizeof(value_str));
+                        // For STRING type, pass the pointer value itself (address of string)
+                        // For other types, pass the dereferenced value
+                        uint32_t value = (field->type == FIELD_TYPE_STRING)
+                            ? (uint32_t)field->ptr
+                            : *field->ptr;
+                        catalog_format_value(field, value, value_str, sizeof(value_str));
                     } else {
                         snprintf(value_str, sizeof(value_str), "N/A");
                     }
@@ -441,30 +493,31 @@ void tui_print_header(void) {
 }
 
 void tui_print_status_banner(void) {
-    char status_buf[CONSOLE_WIDTH + 1];
-
     // Draw separator line
     console_print_line('-');
 
-    // Format status to fit exactly 80 characters
-    // TODO: Checkpoint 8.2 - get live values from wheel model
-    snprintf(status_buf, sizeof(status_buf),
-             "Status: " ANSI_FG_GREEN "IDLE" ANSI_RESET
-             " │ Mode: " ANSI_DIM "OFF" ANSI_RESET
-             " │ RPM: " ANSI_DIM "0" ANSI_RESET
-             " │ Current: " ANSI_DIM "0.00A" ANSI_RESET
-             " │ Fault: " ANSI_DIM "-" ANSI_RESET);
+    // Get live values from control table
+    uint32_t mode = table_control_get_mode();
+    const char* mode_str = table_control_get_mode_string(mode);
+    uint32_t speed_rpm = table_control_get_speed_rpm();
+    uint32_t current_ma = table_control_get_current_ma();
 
-    printf("%s", status_buf);
+    // Convert current from mA to A for display
+    float current_a = current_ma / 1000.0f;
 
-    // Pad to console width
-    int visible_len = 49;  // Approximate visible length without ANSI codes
-    int padding = CONSOLE_WIDTH - visible_len;
-    if (padding > 0) {
-        for (int i = 0; i < padding; i++) {
-            putchar(' ');
-        }
-    }
+    // Format status banner with live values
+    // Status is IDLE if speed is 0, otherwise ACTIVE
+    const char* status = (speed_rpm == 0) ? "IDLE" : "ACTIVE";
+    const char* status_color = (speed_rpm == 0) ? ANSI_FG_GREEN : ANSI_FG_CYAN;
+
+    // Build the status string
+    printf("Status: %s%s" ANSI_RESET " │ Mode: %s%s" ANSI_RESET " │ RPM: %s%lu" ANSI_RESET " │ Current: %s%.2fA" ANSI_RESET " │ Fault: " ANSI_DIM "-" ANSI_RESET,
+           status_color, status,
+           (speed_rpm == 0) ? ANSI_DIM : "", mode_str,
+           (speed_rpm == 0) ? ANSI_DIM : ANSI_FG_CYAN, (unsigned long)speed_rpm,
+           (current_ma == 0) ? ANSI_DIM : ANSI_FG_YELLOW, current_a);
+
+    // Pad to end of line
     printf("\n");
 
     // Draw separator line

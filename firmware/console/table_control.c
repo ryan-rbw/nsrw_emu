@@ -22,6 +22,24 @@ static volatile uint32_t control_pwm_pct = 0;         // PWM duty cycle % (stub)
 static volatile uint32_t control_direction = 0;       // DIRECTION_POSITIVE
 
 // ============================================================================
+// Enum String Tables (UPPERCASE)
+// ============================================================================
+
+// Control mode enum
+static const char* control_mode_enum[] = {
+    "CURRENT",
+    "SPEED",
+    "TORQUE",
+    "PWM"
+};
+
+// Direction enum
+static const char* direction_enum[] = {
+    "POSITIVE",
+    "NEGATIVE"
+};
+
+// ============================================================================
 // Field Definitions
 // ============================================================================
 
@@ -29,12 +47,14 @@ static const field_meta_t control_fields[] = {
     {
         .id = 401,
         .name = "mode",
-        .type = FIELD_TYPE_U32,  // TODO: Change to ENUM type
+        .type = FIELD_TYPE_ENUM,
         .units = "",
         .access = FIELD_ACCESS_RW,
         .default_val = 0,  // CONTROL_MODE_CURRENT
         .ptr = (volatile uint32_t*)&control_mode,
         .dirty = false,
+        .enum_values = control_mode_enum,
+        .enum_count = 4,
     },
     {
         .id = 402,
@@ -45,6 +65,8 @@ static const field_meta_t control_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&control_speed_rpm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 403,
@@ -55,6 +77,8 @@ static const field_meta_t control_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&control_current_ma,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 404,
@@ -65,6 +89,8 @@ static const field_meta_t control_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&control_torque_mnm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 405,
@@ -75,16 +101,20 @@ static const field_meta_t control_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&control_pwm_pct,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 406,
         .name = "direction",
-        .type = FIELD_TYPE_U32,  // TODO: Change to ENUM type
+        .type = FIELD_TYPE_ENUM,
         .units = "",
         .access = FIELD_ACCESS_RW,
         .default_val = 0,  // DIRECTION_POSITIVE
         .ptr = (volatile uint32_t*)&control_direction,
         .dirty = false,
+        .enum_values = direction_enum,
+        .enum_count = 2,
     },
 };
 
@@ -107,4 +137,46 @@ static const table_meta_t control_table = {
 void table_control_init(void) {
     // Register table with catalog
     catalog_register_table(&control_table);
+}
+
+// ============================================================================
+// Getter Functions
+// ============================================================================
+
+uint32_t table_control_get_mode(void) {
+    return control_mode;
+}
+
+uint32_t table_control_get_direction(void) {
+    return control_direction;
+}
+
+uint32_t table_control_get_speed_rpm(void) {
+    return control_speed_rpm;
+}
+
+uint32_t table_control_get_current_ma(void) {
+    return control_current_ma;
+}
+
+uint32_t table_control_get_torque_mnm(void) {
+    return control_torque_mnm;
+}
+
+uint32_t table_control_get_pwm_pct(void) {
+    return control_pwm_pct;
+}
+
+const char* table_control_get_mode_string(uint32_t mode) {
+    if (mode < 4) {
+        return control_mode_enum[mode];
+    }
+    return "INVALID";
+}
+
+const char* table_control_get_direction_string(uint32_t direction) {
+    if (direction < 2) {
+        return direction_enum[direction];
+    }
+    return "INVALID";
 }

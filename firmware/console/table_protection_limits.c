@@ -36,6 +36,8 @@ static const field_meta_t protection_limits_fields[] = {
         .default_val = 36000,
         .ptr = (volatile uint32_t*)&prot_overvolt_v,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 602,
@@ -46,6 +48,8 @@ static const field_meta_t protection_limits_fields[] = {
         .default_val = 6000,
         .ptr = (volatile uint32_t*)&prot_overspeed_rpm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 603,
@@ -56,6 +60,8 @@ static const field_meta_t protection_limits_fields[] = {
         .default_val = 5000,
         .ptr = (volatile uint32_t*)&prot_soft_overspeed_rpm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 604,
@@ -66,6 +72,8 @@ static const field_meta_t protection_limits_fields[] = {
         .default_val = 6000,
         .ptr = (volatile uint32_t*)&prot_overcurr_a,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 605,
@@ -76,6 +84,8 @@ static const field_meta_t protection_limits_fields[] = {
         .default_val = 5000,
         .ptr = (volatile uint32_t*)&prot_soft_overcurr_a,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 606,
@@ -86,6 +96,8 @@ static const field_meta_t protection_limits_fields[] = {
         .default_val = 100000,
         .ptr = (volatile uint32_t*)&prot_overpower_w,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 607,
@@ -96,6 +108,8 @@ static const field_meta_t protection_limits_fields[] = {
         .default_val = 9785,
         .ptr = (volatile uint32_t*)&prot_max_duty_pct,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 

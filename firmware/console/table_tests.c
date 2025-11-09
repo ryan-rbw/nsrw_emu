@@ -32,6 +32,8 @@ static const field_meta_t test_fields[] = {
         .default_val = 0,
         .ptr = &tests_total,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 101,
@@ -42,6 +44,8 @@ static const field_meta_t test_fields[] = {
         .default_val = 0,
         .ptr = &tests_passed,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 102,
@@ -52,6 +56,8 @@ static const field_meta_t test_fields[] = {
         .default_val = 0,
         .ptr = &tests_failed,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 103,
@@ -62,6 +68,8 @@ static const field_meta_t test_fields[] = {
         .default_val = 0,
         .ptr = &tests_duration_ms,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 

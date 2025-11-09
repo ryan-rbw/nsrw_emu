@@ -15,6 +15,19 @@
 #include <string.h>
 
 // ============================================================================
+// Enum String Tables (UPPERCASE)
+// ============================================================================
+
+// Scenario enum (matching scenario_registry.c order)
+static const char* scenario_enum[] = {
+    "SINGLE CRC ERROR",
+    "CRC BURST TEST",
+    "FRAME DROP 50%",
+    "OVERSPEED FAULT",
+    "POWER LIMIT TEST"
+};
+
+// ============================================================================
 // Live Data
 // ============================================================================
 
@@ -31,12 +44,14 @@ static const field_meta_t fault_injection_fields[] = {
     {
         .id = 1001,
         .name = "scenario_index",
-        .type = FIELD_TYPE_U8,
+        .type = FIELD_TYPE_ENUM,
         .units = "",
         .access = FIELD_ACCESS_RW,
         .default_val = 0,
         .ptr = (volatile uint32_t*)&fic_scenario_index,
         .dirty = false,
+        .enum_values = scenario_enum,
+        .enum_count = 5,
     },
     {
         .id = 1002,
@@ -47,6 +62,8 @@ static const field_meta_t fault_injection_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&fic_scenario_count,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 1003,
@@ -57,6 +74,8 @@ static const field_meta_t fault_injection_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)fic_selected_name,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 1004,
@@ -67,6 +86,8 @@ static const field_meta_t fault_injection_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&fic_trigger,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 
@@ -196,6 +217,7 @@ void fault_injection_execute(void) {
     }
 
     printf("[EXEC] Scenario active - monitoring timeline...\n");
+    printf("[INFO] Press any key to abort scenario execution\n");
     printf("────────────────────────────────────────────────────────────────\n");
 
     // Run timeline with live updates
@@ -242,6 +264,7 @@ void fault_injection_execute(void) {
     uint32_t total_events = scenario_get_total_events();
     printf("\n[DONE] Scenario complete\n");
     printf("[SUMMARY] %d/%d events triggered\n", final_triggered, total_events);
+    printf("[INFO] Trigger field auto-cleared (one-shot activation)\n");
 
     if (final_triggered == total_events) {
         printf("✓ All events triggered successfully\n");

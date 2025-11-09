@@ -36,6 +36,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 1,
         .ptr = (volatile uint32_t*)&serial_status,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 202,
@@ -46,6 +48,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&serial_tx_count,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 203,
@@ -56,6 +60,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&serial_rx_count,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 204,
@@ -66,6 +72,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&serial_tx_errors,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 205,
@@ -76,6 +84,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&serial_rx_errors,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 206,
@@ -86,6 +96,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 4608,
         .ptr = (volatile uint32_t*)&serial_baud_kbps,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 207,
@@ -96,6 +108,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&serial_slip_frames_ok,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 208,
@@ -106,6 +120,8 @@ static const field_meta_t serial_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&serial_crc_errors,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 

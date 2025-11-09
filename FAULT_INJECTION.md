@@ -46,10 +46,10 @@ Scenarios are defined in JSON files, compiled into firmware, and triggered inter
 
 ### 1. Create a Scenario
 
-Create a JSON file in `firmware/config/scenarios/`:
+Create a JSON file in `tests/scenarios/`:
 
 ```bash
-cd firmware/config/scenarios/
+cd tests/scenarios/
 nano my_test.json
 ```
 
@@ -230,10 +230,10 @@ Scenarios are **compiled into firmware** as C string constants. This avoids need
 
 ### Step 1: Create Scenario JSON File
 
-Save your scenario in `firmware/config/scenarios/`:
+Save your scenario in `tests/scenarios/`:
 
 ```bash
-cd firmware/config/scenarios/
+cd tests/scenarios/
 nano crc_burst_test.json
 ```
 
@@ -663,9 +663,9 @@ The following features are planned for Phase 10:
 
 ## References
 
-- **JSON Schema**: See `firmware/config/scenarios/README.md`
+- **JSON Schema**: See `tests/scenarios/README.md`
 - **API Reference**: See `firmware/config/scenario.h`
-- **Example Scenarios**: `firmware/config/scenarios/*.json`
+- **Example Scenarios**: `tests/scenarios/*.json`
 - **Implementation Plan**: [IMP.md Phase 9](IMP.md#phase-9-fault-injection-system)
 - **Progress Tracking**: [PROGRESS.md Phase 9](PROGRESS.md#phase-9-fault-injection-system--complete)
 

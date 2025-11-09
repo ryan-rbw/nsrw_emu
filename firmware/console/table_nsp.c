@@ -34,6 +34,8 @@ static const field_meta_t nsp_fields[] = {
         .default_val = 0x00,
         .ptr = (volatile uint32_t*)&nsp_last_cmd,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 302,
@@ -44,6 +46,8 @@ static const field_meta_t nsp_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&nsp_poll_seen,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 303,
@@ -54,6 +58,8 @@ static const field_meta_t nsp_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&nsp_ack_bit,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 304,
@@ -64,6 +70,8 @@ static const field_meta_t nsp_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&nsp_cmd_count,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 305,
@@ -74,6 +82,8 @@ static const field_meta_t nsp_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&nsp_reply_count,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 306,
@@ -84,6 +94,8 @@ static const field_meta_t nsp_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&nsp_last_timing_ms,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 

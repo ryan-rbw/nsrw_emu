@@ -38,6 +38,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_speed_rpm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 502,
@@ -48,6 +50,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_momentum_nms,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 503,
@@ -58,6 +62,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_torque_cmd_mnm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 504,
@@ -68,6 +74,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_torque_out_mnm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 505,
@@ -78,6 +86,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_current_cmd_ma,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 506,
@@ -88,6 +98,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_current_out_ma,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 507,
@@ -98,6 +110,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_power_w,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 508,
@@ -108,6 +122,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_loss_visc,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 509,
@@ -118,6 +134,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_loss_fric,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 510,
@@ -128,6 +146,8 @@ static const field_meta_t dynamics_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&dyn_alpha_rad_s2,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 

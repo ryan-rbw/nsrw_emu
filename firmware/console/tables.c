@@ -18,7 +18,9 @@
 #include "table_config.h"
 #include "table_fault_injection.h"
 #include <string.h>
+#include <strings.h>  // For strcasecmp
 #include <stdio.h>
+#include <stdlib.h>   // For atoi
 #include <ctype.h>
 
 // ============================================================================
@@ -187,11 +189,32 @@ void catalog_format_value(const field_meta_t* field, uint32_t value, char* buf, 
     // Simple formatter (will be enhanced with proper UQ decoding)
     switch (field->type) {
         case FIELD_TYPE_BOOL:
-            snprintf(buf, buflen, "%s", value ? "true" : "false");
+            snprintf(buf, buflen, "%s", value ? "TRUE" : "FALSE");
             break;
 
         case FIELD_TYPE_HEX:
             snprintf(buf, buflen, "0x%08lX", (unsigned long)value);
+            break;
+
+        case FIELD_TYPE_ENUM:
+            // Display enum as UPPERCASE string
+            if (field->enum_values && value < field->enum_count) {
+                snprintf(buf, buflen, "%s", field->enum_values[value]);
+            } else {
+                snprintf(buf, buflen, "INVALID(%lu)", (unsigned long)value);
+            }
+            break;
+
+        case FIELD_TYPE_STRING:
+            // String ptr is cast to uint32_t - cast back to char*
+            {
+                const char* str = (const char*)(uintptr_t)value;
+                if (str) {
+                    snprintf(buf, buflen, "%s", str);
+                } else {
+                    snprintf(buf, buflen, "(null)");
+                }
+            }
             break;
 
         case FIELD_TYPE_FLOAT:
@@ -215,7 +238,70 @@ bool catalog_parse_value(const field_meta_t* field, const char* str, uint32_t* v
         return false;
     }
 
-    // TODO: Implement type-specific parsing
-    *value = 0;
-    return false;
+    switch (field->type) {
+        case FIELD_TYPE_BOOL:
+            // Accept: "true", "false", "1", "0", "yes", "no"
+            if (strcasecmp(str, "true") == 0 || strcasecmp(str, "yes") == 0 || strcmp(str, "1") == 0) {
+                *value = 1;
+                return true;
+            } else if (strcasecmp(str, "false") == 0 || strcasecmp(str, "no") == 0 || strcmp(str, "0") == 0) {
+                *value = 0;
+                return true;
+            }
+            return false;
+
+        case FIELD_TYPE_ENUM:
+            // Special case: "?" returns false to trigger help display
+            if (strcmp(str, "?") == 0) {
+                return false;  // Caller should detect this and show help
+            }
+
+            // Try case-insensitive string match
+            if (field->enum_values) {
+                for (uint8_t i = 0; i < field->enum_count; i++) {
+                    if (strcasecmp(str, field->enum_values[i]) == 0) {
+                        *value = i;
+                        return true;
+                    }
+                }
+            }
+
+            // Fall back to numeric input (backward compatible)
+            char* endptr;
+            long num = strtol(str, &endptr, 10);
+            if (*endptr == '\0' && num >= 0 && num < field->enum_count) {
+                *value = (uint32_t)num;
+                return true;
+            }
+
+            return false;  // Invalid enum value
+
+        case FIELD_TYPE_U8:
+        case FIELD_TYPE_U16:
+        case FIELD_TYPE_U32:
+            {
+                char* endptr;
+                long num = strtol(str, &endptr, 10);
+                if (*endptr == '\0' && num >= 0) {
+                    *value = (uint32_t)num;
+                    return true;
+                }
+            }
+            return false;
+
+        case FIELD_TYPE_HEX:
+            {
+                char* endptr;
+                long num = strtol(str, &endptr, 16);
+                if (*endptr == '\0') {
+                    *value = (uint32_t)num;
+                    return true;
+                }
+            }
+            return false;
+
+        default:
+            // Unsupported type
+            return false;
+    }
 }

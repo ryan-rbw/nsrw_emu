@@ -34,6 +34,8 @@ static const field_meta_t telemetry_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&telem_block_id,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 702,
@@ -44,6 +46,8 @@ static const field_meta_t telemetry_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&telem_uptime_s,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 703,
@@ -54,6 +58,8 @@ static const field_meta_t telemetry_fields[] = {
         .default_val = 25000,
         .ptr = (volatile uint32_t*)&telem_temp_c,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 704,
@@ -64,6 +70,8 @@ static const field_meta_t telemetry_fields[] = {
         .default_val = 28000,
         .ptr = (volatile uint32_t*)&telem_voltage_v,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 705,
@@ -74,6 +82,8 @@ static const field_meta_t telemetry_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&telem_current_ma,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 706,
@@ -84,6 +94,8 @@ static const field_meta_t telemetry_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&telem_speed_rpm,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 

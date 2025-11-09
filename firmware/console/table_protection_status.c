@@ -31,6 +31,8 @@ static const field_meta_t protection_status_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&prot_flags,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
     {
         .id = 609,
@@ -41,6 +43,8 @@ static const field_meta_t protection_status_fields[] = {
         .default_val = 0,
         .ptr = (volatile uint32_t*)&prot_warnings,
         .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
     },
 };
 
