@@ -12,6 +12,7 @@
 #include "console_config.h"
 #include "console_format.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include "pico/stdlib.h"
@@ -104,7 +105,8 @@ void tui_update(bool force_redraw) {
             break;
 
         case TUI_MODE_EDIT:
-            // Field editing (future enhancement)
+            // In edit mode, re-render browse view with input shown in status bar
+            tui_render_browse();
             break;
     }
 
@@ -116,6 +118,7 @@ void tui_update(bool force_redraw) {
 // ============================================================================
 
 static bool tui_handle_browse_input(int key);
+static bool tui_handle_edit_input(int key);
 
 bool tui_handle_input(void) {
     int key = tui_getkey();
@@ -127,6 +130,9 @@ bool tui_handle_input(void) {
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
             return tui_handle_browse_input(key);
+
+        case TUI_MODE_EDIT:
+            return tui_handle_edit_input(key);
 
         default:
             return false;
@@ -189,7 +195,7 @@ static bool tui_handle_browse_input(int key) {
 
         case '\r':
         case '\n':
-            // Enter: Edit selected field (future enhancement)
+            // Enter: Edit selected field
             if (g_tui_state.table_expanded[g_tui_state.selected_table_idx]) {
                 // Get selected field
                 const table_meta_t* table = catalog_get_table_by_index(g_tui_state.selected_table_idx);
@@ -197,8 +203,12 @@ static bool tui_handle_browse_input(int key) {
                     const field_meta_t* field = catalog_get_field(table, g_tui_state.selected_field_idx);
 
                     if (field && field->access != FIELD_ACCESS_RO) {
+                        // Enter edit mode
+                        g_tui_state.mode = TUI_MODE_EDIT;
+                        g_tui_state.input_len = 0;
+                        g_tui_state.input_buf[0] = '\0';
                         snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
-                                 "Editing not yet implemented");
+                                 "Enter new value (ESC to cancel): ");
                         g_tui_state.needs_refresh = true;
                     } else {
                         snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
@@ -221,6 +231,82 @@ static bool tui_handle_browse_input(int key) {
             // Quit TUI
             tui_shutdown();
             return true;
+    }
+
+    return false;
+}
+
+static bool tui_handle_edit_input(int key) {
+    // Get currently selected field
+    const table_meta_t* table = catalog_get_table_by_index(g_tui_state.selected_table_idx);
+    if (!table) {
+        g_tui_state.mode = TUI_MODE_BROWSE;
+        return false;
+    }
+
+    const field_meta_t* field = catalog_get_field(table, g_tui_state.selected_field_idx);
+    if (!field) {
+        g_tui_state.mode = TUI_MODE_BROWSE;
+        return false;
+    }
+
+    switch (key) {
+        case 27:  // ESC - cancel editing
+            g_tui_state.mode = TUI_MODE_BROWSE;
+            snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                     "Edit cancelled");
+            g_tui_state.needs_refresh = true;
+            return true;
+
+        case '\r':
+        case '\n':  // Enter - save value
+            if (g_tui_state.input_len > 0) {
+                // Parse and write value
+                g_tui_state.input_buf[g_tui_state.input_len] = '\0';
+
+                // Simple integer parsing for now
+                char* endptr;
+                long value = strtol(g_tui_state.input_buf, &endptr, 10);
+
+                if (endptr != g_tui_state.input_buf && *endptr == '\0') {
+                    // Valid number - write to field
+                    if (field->ptr) {
+                        *(volatile uint32_t*)field->ptr = (uint32_t)value;
+                        snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                 "Saved: %s = %ld", field->name, value);
+                    } else {
+                        snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                 "Error: No pointer for field");
+                    }
+                } else {
+                    snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                             "Error: Invalid number");
+                }
+            }
+            g_tui_state.mode = TUI_MODE_BROWSE;
+            g_tui_state.needs_refresh = true;
+            return true;
+
+        case 127:   // Backspace
+        case '\b':
+            if (g_tui_state.input_len > 0) {
+                g_tui_state.input_len--;
+                g_tui_state.input_buf[g_tui_state.input_len] = '\0';
+                g_tui_state.needs_refresh = true;
+            }
+            return true;
+
+        default:
+            // Accept printable characters (digits, +, -)
+            if ((key >= '0' && key <= '9') || key == '-' || key == '+') {
+                if (g_tui_state.input_len < sizeof(g_tui_state.input_buf) - 1) {
+                    g_tui_state.input_buf[g_tui_state.input_len++] = (char)key;
+                    g_tui_state.input_buf[g_tui_state.input_len] = '\0';
+                    g_tui_state.needs_refresh = true;
+                }
+                return true;
+            }
+            break;
     }
 
     return false;
@@ -389,7 +475,13 @@ void tui_print_status_bar(const char* message) {
     printf("\n");
     console_print_line('-');
     if (message && message[0]) {
-        printf(ANSI_FG_YELLOW "%s" ANSI_RESET "\n", message);
+        printf(ANSI_FG_YELLOW "%s" ANSI_RESET, message);
+
+        // In edit mode, show input buffer
+        if (g_tui_state.mode == TUI_MODE_EDIT) {
+            printf(ANSI_BOLD "%s" ANSI_RESET "_", g_tui_state.input_buf);
+        }
+        printf("\n");
     }
 }
 
