@@ -27,6 +27,7 @@ add_executable(nrwa_t6_emulator
     # Test mode (runs at boot, results cached)
     test_mode.c
     test_results.c
+    test_phase9.c
     # Console & TUI (Phase 8)
     console/tui.c
     console/tables.c

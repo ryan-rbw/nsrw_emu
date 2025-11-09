@@ -25,11 +25,15 @@
 // Test system
 #include "test_mode.h"
 #include "test_results.h"
+#include "test_phase9.h"
 
 // Console TUI
 #include "tui.h"
 #include "tables.h"
 #include "logo.h"
+
+// Uncomment to run Phase 9 tests at boot
+// #define RUN_PHASE9_TESTS
 
 // Firmware version (passed from CMake)
 #ifndef FIRMWARE_VERSION
@@ -107,6 +111,11 @@ int main(void) {
 
     test_results_init();
     run_all_checkpoint_tests();
+
+#ifdef RUN_PHASE9_TESTS
+    // Run Phase 9 scenario engine tests
+    run_phase9_tests();
+#endif
 
     // Wait for user to acknowledge test results
     printf("Waiting for keypress...\n");
