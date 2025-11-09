@@ -32,8 +32,8 @@
 #include "tables.h"
 #include "logo.h"
 
-// Uncomment to run Phase 9 tests at boot
-#define RUN_PHASE9_TESTS
+// Uncomment to run Phase 9 tests at boot (normally user-triggered from TUI)
+// #define RUN_PHASE9_TESTS
 
 // Firmware version (passed from CMake)
 #ifndef FIRMWARE_VERSION

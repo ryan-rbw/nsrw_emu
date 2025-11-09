@@ -15,12 +15,12 @@
 // Live Data
 // ============================================================================
 
+static char cfg_scenario_name[64] = "";                 // Scenario name (ASCII)
+static volatile uint32_t cfg_scenario_loaded = 0;       // Scenario loaded (bool)
 static volatile uint32_t cfg_scenario_active = 0;       // Scenario active (bool)
 static volatile uint32_t cfg_scenario_elapsed_ms = 0;   // Elapsed time (ms)
 static volatile uint32_t cfg_scenario_events_total = 0; // Total events
 static volatile uint32_t cfg_scenario_events_triggered = 0; // Triggered count
-static volatile uint32_t cfg_defaults_dirty = 0;        // Non-default count
-static volatile uint32_t cfg_json_loaded = 0;           // JSON loaded (bool)
 
 // ============================================================================
 // Field Definitions
@@ -29,6 +29,26 @@ static volatile uint32_t cfg_json_loaded = 0;           // JSON loaded (bool)
 static const field_meta_t config_fields[] = {
     {
         .id = 901,
+        .name = "scenario_name",
+        .type = FIELD_TYPE_STRING,
+        .units = "",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)cfg_scenario_name,
+        .dirty = false,
+    },
+    {
+        .id = 902,
+        .name = "scenario_loaded",
+        .type = FIELD_TYPE_BOOL,
+        .units = "",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&cfg_scenario_loaded,
+        .dirty = false,
+    },
+    {
+        .id = 903,
         .name = "scenario_active",
         .type = FIELD_TYPE_BOOL,
         .units = "",
@@ -38,8 +58,8 @@ static const field_meta_t config_fields[] = {
         .dirty = false,
     },
     {
-        .id = 902,
-        .name = "scenario_elapsed_ms",
+        .id = 904,
+        .name = "elapsed_ms",
         .type = FIELD_TYPE_U32,
         .units = "ms",
         .access = FIELD_ACCESS_RO,
@@ -48,18 +68,8 @@ static const field_meta_t config_fields[] = {
         .dirty = false,
     },
     {
-        .id = 903,
-        .name = "scenario_events_total",
-        .type = FIELD_TYPE_U32,
-        .units = "events",
-        .access = FIELD_ACCESS_RO,
-        .default_val = 0,
-        .ptr = (volatile uint32_t*)&cfg_scenario_events_total,
-        .dirty = false,
-    },
-    {
-        .id = 904,
-        .name = "scenario_events_triggered",
+        .id = 905,
+        .name = "events_triggered",
         .type = FIELD_TYPE_U32,
         .units = "events",
         .access = FIELD_ACCESS_RO,
@@ -68,23 +78,13 @@ static const field_meta_t config_fields[] = {
         .dirty = false,
     },
     {
-        .id = 905,
-        .name = "defaults_dirty",
-        .type = FIELD_TYPE_U32,
-        .units = "fields",
-        .access = FIELD_ACCESS_RO,
-        .default_val = 0,
-        .ptr = (volatile uint32_t*)&cfg_defaults_dirty,
-        .dirty = false,
-    },
-    {
         .id = 906,
-        .name = "json_loaded",
-        .type = FIELD_TYPE_BOOL,
-        .units = "",
+        .name = "events_total",
+        .type = FIELD_TYPE_U32,
+        .units = "events",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&cfg_json_loaded,
+        .ptr = (volatile uint32_t*)&cfg_scenario_events_total,
         .dirty = false,
     },
 };
@@ -123,18 +123,20 @@ void table_config_init(void) {
  * Call this periodically to refresh TUI display
  */
 void table_config_update(void) {
+    // Update scenario name
+    const char* name = scenario_get_name();
+    if (name != NULL) {
+        strncpy(cfg_scenario_name, name, sizeof(cfg_scenario_name) - 1);
+        cfg_scenario_name[sizeof(cfg_scenario_name) - 1] = '\0';
+        cfg_scenario_loaded = 1;
+    } else {
+        strcpy(cfg_scenario_name, "(none)");
+        cfg_scenario_loaded = 0;
+    }
+
+    // Update scenario status
     cfg_scenario_active = scenario_is_active() ? 1 : 0;
     cfg_scenario_elapsed_ms = scenario_get_elapsed_ms();
     cfg_scenario_events_total = scenario_get_total_events();
     cfg_scenario_events_triggered = scenario_get_triggered_count();
-
-    // json_loaded set to 1 when scenario is loaded
-    if (scenario_get_name() != NULL) {
-        cfg_json_loaded = 1;
-    } else {
-        cfg_json_loaded = 0;
-    }
-
-    // defaults_dirty: future feature - count non-default fields
-    cfg_defaults_dirty = 0;
 }
