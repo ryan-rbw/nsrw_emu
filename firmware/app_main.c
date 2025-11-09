@@ -33,7 +33,7 @@
 #include "logo.h"
 
 // Uncomment to run Phase 9 tests at boot
-// #define RUN_PHASE9_TESTS
+#define RUN_PHASE9_TESTS
 
 // Firmware version (passed from CMake)
 #ifndef FIRMWARE_VERSION

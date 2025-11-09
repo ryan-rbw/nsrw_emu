@@ -96,6 +96,9 @@ void test_scenario_loading(void) {
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
 
+    // Initialize scenario engine
+    scenario_engine_init();
+
     // Load scenario
     bool result = scenario_load(test_scenario_simple, strlen(test_scenario_simple));
     if (!result) {
@@ -143,6 +146,9 @@ void test_scenario_timeline(void) {
     printf("║  TEST 3: TIMELINE EXECUTION                               ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
+
+    // Initialize scenario engine
+    scenario_engine_init();
 
     // Load and activate scenario
     scenario_load(test_scenario_simple, strlen(test_scenario_simple));
@@ -196,6 +202,9 @@ void test_config_table_update(void) {
     printf("║  TEST 4: CONFIG TABLE INTEGRATION                         ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
     printf("\n");
+
+    // Initialize scenario engine
+    scenario_engine_init();
 
     // Load and activate scenario
     scenario_load(test_scenario_simple, strlen(test_scenario_simple));
