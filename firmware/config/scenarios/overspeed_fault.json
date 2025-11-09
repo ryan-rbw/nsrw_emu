@@ -1,0 +1,14 @@
+{
+  "name": "Overspeed Fault Test",
+  "description": "Trigger overspeed fault at t=5s to test fault latching and CLEAR-FAULT handling",
+  "version": "1.0",
+  "schedule": [
+    {
+      "t_ms": 5000,
+      "duration_ms": 0,
+      "action": {
+        "overspeed_fault": true
+      }
+    }
+  ]
+}

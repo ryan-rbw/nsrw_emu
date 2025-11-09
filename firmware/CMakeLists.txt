@@ -21,6 +21,9 @@ add_executable(nrwa_t6_emulator
     device/nss_nrwa_t6_telemetry.c
     # Protection system (Phase 7)
     device/nss_nrwa_t6_protection.c
+    # Fault injection (Phase 9)
+    config/json_loader.c
+    config/scenario.c
     # Test mode (runs at boot, results cached)
     test_mode.c
     test_results.c
@@ -64,6 +67,7 @@ target_include_directories(nrwa_t6_emulator PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers
     ${CMAKE_CURRENT_SOURCE_DIR}/device
     ${CMAKE_CURRENT_SOURCE_DIR}/console
+    ${CMAKE_CURRENT_SOURCE_DIR}/config
     ${CMAKE_CURRENT_SOURCE_DIR}/util
 )
 
