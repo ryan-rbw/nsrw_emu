@@ -29,6 +29,7 @@
 // Console TUI
 #include "tui.h"
 #include "tables.h"
+#include "logo.h"
 
 // Firmware version (passed from CMake)
 #ifndef FIRMWARE_VERSION
@@ -47,7 +48,11 @@ static void print_banner(void) {
     pico_unique_board_id_t board_id;
     pico_get_unique_board_id(&board_id);
 
-    printf("\nNRWA-T6 Emulator %s\n", FIRMWARE_VERSION);
+    // Print company logo
+    printf("\n%s\n", LOGO_ART);
+
+    // Print banner
+    printf("NRWA-T6 Emulator %s\n", FIRMWARE_VERSION);
     printf("NewSpace NRWA-T6 Compatible | RP2040\n");
     printf("Board: %02X%02X%02X%02X%02X%02X%02X%02X\n",
            board_id.id[0], board_id.id[1], board_id.id[2], board_id.id[3],
