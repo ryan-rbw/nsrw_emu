@@ -31,6 +31,11 @@
 #include "tui.h"
 #include "tables.h"
 #include "logo.h"
+#include "table_config.h"
+#include "table_fault_injection.h"
+
+// Fault injection
+#include "config/scenario.h"
 
 // Uncomment to run Phase 9 tests at boot (normally user-triggered from TUI)
 // #define RUN_PHASE9_TESTS
@@ -165,8 +170,14 @@ int main(void) {
             tui_refresh_counter = 0;  // Reset periodic counter after input
         }
 
+        // Update scenario engine (check for event triggers)
+        scenario_update();
+
+        // Update table values from scenario engine
+        table_config_update();
+        table_fault_injection_update();
+
         // TODO: Phase 3 - Poll RS-485 for incoming NSP packets
-        // TODO: Phase 9 - Update fault injection scenarios
 
         // Small delay to avoid busy-waiting
         sleep_ms(50);  // 20 Hz update rate

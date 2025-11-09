@@ -16,6 +16,7 @@
 #include "table_protection_status.h"
 #include "table_telemetry.h"
 #include "table_config.h"
+#include "table_fault_injection.h"
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -47,6 +48,7 @@ void catalog_init(void) {
     table_protection_status_init();
     table_telemetry_init();
     table_config_init();
+    table_fault_injection_init();
 
     printf("[CATALOG] Initialized with %d tables\n", catalog_count);
 }

@@ -24,6 +24,7 @@ add_executable(nrwa_t6_emulator
     # Fault injection (Phase 9)
     config/json_loader.c
     config/scenario.c
+    config/scenario_registry.c
     # Test mode (runs at boot, results cached)
     test_mode.c
     test_results.c
@@ -41,6 +42,7 @@ add_executable(nrwa_t6_emulator
     console/table_protection_status.c
     console/table_telemetry.c
     console/table_config.c
+    console/table_fault_injection.c
 )
 
 # Pass version string as compile definition
