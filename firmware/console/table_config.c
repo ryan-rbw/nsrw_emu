@@ -1,8 +1,8 @@
 /**
  * @file table_config.c
- * @brief Config & JSON Table Implementation
+ * @brief Fault Injection Status Table Implementation
  *
- * Table 9: Config Status (scenarios, defaults, save/restore)
+ * Table 9: Fault Injection Status (scenario engine, timeline, events)
  */
 
 #include "table_config.h"
@@ -95,8 +95,8 @@ static const field_meta_t config_fields[] = {
 
 static const table_meta_t config_table = {
     .id = 9,
-    .name = "Config Status",
-    .description = "Scenarios, defaults, save/restore",
+    .name = "Fault Injection Status",
+    .description = "Scenario engine, timeline, events",
     .fields = config_fields,
     .field_count = sizeof(config_fields) / sizeof(config_fields[0]),
 };

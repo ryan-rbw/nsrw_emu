@@ -1,7 +1,7 @@
 /**
- * @brief Config & JSON Table for Console TUI
+ * @brief Fault Injection Status Table for Console TUI
  *
- * Table 9: Config Status (scenarios, defaults, save/restore)
+ * Table 9: Fault Injection Status (scenario engine, timeline, events)
  */
 
 #ifndef TABLE_CONFIG_H
