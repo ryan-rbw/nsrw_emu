@@ -8,6 +8,7 @@
 #include "tui.h"
 #include "tables.h"
 #include "test_results.h"
+#include "logo.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -316,6 +317,10 @@ void tui_print_header(void) {
     uint32_t uptime_ms = to_ms_since_boot(get_absolute_time()) - g_boot_time_ms;
     uint32_t uptime_sec = uptime_ms / 1000;
 
+    // Print logo
+    printf("%s", LOGO_ART);
+
+    // Print header info
     printf(ANSI_BOLD ANSI_FG_CYAN "NRWA-T6 Emulator" ANSI_RESET);
     printf("  |  ");
     printf("Uptime: %02lu:%02lu:%02lu",
