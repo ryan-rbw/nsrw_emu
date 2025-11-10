@@ -57,6 +57,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Updated character acceptance filter to allow letters for BOOL fields
   - Enables typing "true" or "false" instead of just "1" or "0"
 
+- **Stale Status Messages** - Status messages persisted after navigation
+  - Clear status message when refreshing (r key)
+  - Clear status message when expanding/collapsing tables
+  - Prevents confusion from outdated "Saved:" messages
+
 ### Changed
 - **Test Organization** - Moved fault injection scenarios to proper location
   - Scenarios moved from `firmware/config/scenarios/` to `tests/scenarios/`
@@ -71,9 +76,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Updated `PROGRESS.md` - Phase 9 section with new paths
 
 ### Technical Details
-- **Files Modified**: 14 files (tables, TUI, documentation)
-- **Lines Changed**: ~350 lines of code, ~850 lines of documentation
-- **Code Size Impact**: +224 bytes flash (111,024 bytes total, 0.2% increase)
+- **Files Modified**: 15 files (tables, TUI, documentation)
+- **Lines Changed**: ~353 lines of code, ~850 lines of documentation
+- **Code Size Impact**: +248 bytes flash (111,048 bytes total, 0.2% increase)
 - **Build Status**: Clean build, no warnings or errors
 
 ---

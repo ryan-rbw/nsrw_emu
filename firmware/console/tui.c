@@ -184,6 +184,7 @@ static bool tui_handle_browse_input(int key) {
             // Expand selected table
             g_tui_state.table_expanded[g_tui_state.selected_table_idx] = true;
             g_tui_state.selected_field_idx = 0;
+            g_tui_state.status_msg[0] = '\0';  // Clear status message
             g_tui_state.needs_refresh = true;
             return true;
 
@@ -191,6 +192,7 @@ static bool tui_handle_browse_input(int key) {
             // Collapse expanded table
             g_tui_state.table_expanded[g_tui_state.selected_table_idx] = false;
             g_tui_state.selected_field_idx = 0;
+            g_tui_state.status_msg[0] = '\0';  // Clear status message
             g_tui_state.needs_refresh = true;
             return true;
 
@@ -229,7 +231,8 @@ static bool tui_handle_browse_input(int key) {
 
         case 'r':
         case 'R':
-            // Refresh
+            // Refresh and clear status message
+            g_tui_state.status_msg[0] = '\0';
             g_tui_state.needs_refresh = true;
             return true;
 
