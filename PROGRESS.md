@@ -3,7 +3,7 @@
 **Project**: Reaction Wheel Emulator for NewSpace Systems NRWA-T6
 **Platform**: Raspberry Pi Pico (RP2040)
 **Started**: 2025-11-05
-**Last Updated**: 2025-11-09
+**Last Updated**: 2025-11-10
 
 ---
 
@@ -1359,6 +1359,7 @@ Comprehensive field type support:
 - Fixed uninitialized enum fields in all table definitions
 - Fixed BOOL field character input acceptance
 - Fixed table alignment for single vs. double-digit table numbers
+- Fixed stale status messages persisting after navigation/refresh
 
 ### Files Created/Modified
 
@@ -1371,14 +1372,16 @@ Comprehensive field type support:
 | [firmware/console/table_*.c](firmware/console/) | 2,200 | 10 tables total (all fixed for enum support) |
 | **Total Console Code** | **3,370** | **Complete TUI system** |
 
-### Documentation Created
+### TUI Improvements (2025-11-10)
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| [ENUM_SYSTEM.md](ENUM_SYSTEM.md) | 320 | Complete enum system guide |
-| [TODO_AUDIT.md](TODO_AUDIT.md) | 180 | Categorized TODO/stub audit |
-| [RECENT_CHANGES.md](RECENT_CHANGES.md) | 350 | TUI improvements summary |
-| [CHANGELOG.md](CHANGELOG.md) | 150 | Project changelog |
+**Recent enhancements**:
+
+1. Enum system with UPPERCASE display and case-insensitive input
+2. BOOL fields accept text ("true"/"false") in addition to 1/0
+3. Interactive "?" help for ENUM and BOOL fields
+4. Live banner with real-time values from Table 4
+5. Status message clearing on navigation to prevent stale messages
+6. Table number alignment for 10+ tables
 
 ### Acceptance Criteria
 
@@ -1394,7 +1397,8 @@ Comprehensive field type support:
 ### Metrics
 
 **Code Size**:
-- Flash usage: 111,024 bytes (43% of 256 KB)
+
+- Flash usage: 111,048 bytes (43.4% of 256 KB)
 - Console code: 3,370 lines
 - Total enum strings: ~150 bytes
 
