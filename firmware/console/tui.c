@@ -12,6 +12,9 @@
 #include "console_config.h"
 #include "console_format.h"
 #include "table_control.h"
+#include "table_test_modes.h"
+#include "nss_nrwa_t6_model.h"
+#include "nss_nrwa_t6_protection.h"
 #include "util/core_sync.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +34,9 @@
 // ============================================================================
 // Global State
 // ============================================================================
+
+// External wheel state (for status banner)
+extern wheel_state_t g_wheel_state;
 
 static tui_state_t g_tui_state;
 static uint32_t g_boot_time_ms;
@@ -121,6 +127,98 @@ void tui_update(bool force_redraw) {
     }
 
     g_tui_state.needs_refresh = false;
+}
+
+// ============================================================================
+// Test Mode Menu
+// ============================================================================
+
+/**
+ * @brief Show interactive test mode menu
+ */
+static void tui_show_test_mode_menu(void) {
+    tui_clear_screen();
+
+    // Header
+    printf("\n");
+    printf(ANSI_BOLD "═══ Test Mode Menu ═══" ANSI_RESET "\n");
+    printf("\n");
+
+    // List available test modes
+    table_test_modes_list();
+
+    // Show current status
+    printf("\n");
+    table_test_modes_print_status();
+
+    // Menu options
+    printf(ANSI_BOLD "Options:" ANSI_RESET "\n");
+    printf("  Press 1-7 to activate test mode\n");
+    printf("  Press 0 to deactivate current test mode\n");
+    printf("  Press C to clear all faults\n");
+    printf("  Press Q to return to main menu\n");
+    printf("\n");
+    printf("Waiting for key...");
+    fflush(stdout);
+
+    // Read single key input - block until key is pressed
+    int key;
+    do {
+        key = tui_getkey();
+        sleep_ms(10);  // Small delay to avoid busy-wait
+    } while (key == PICO_ERROR_TIMEOUT);
+
+    printf("\n\n");
+
+    if (key >= '1' && key <= '7') {
+        // Activate selected mode
+        int selection = key - '0';
+        if (table_test_modes_activate(selection)) {
+            printf(ANSI_FG_GREEN "Test mode activated!" ANSI_RESET "\n");
+            printf("Check Table 11 (Test Modes) and Table 5 (Dynamics) for status.\n");
+        } else {
+            printf(ANSI_FG_RED "Failed to activate test mode." ANSI_RESET "\n");
+        }
+    } else if (key == '0') {
+        // Deactivate
+        table_test_modes_deactivate();
+        printf(ANSI_FG_GREEN "Test mode deactivated." ANSI_RESET "\n");
+    } else if (key == 'c' || key == 'C') {
+        // Clear all faults
+        if (wheel_model_is_lcl_tripped(&g_wheel_state)) {
+            printf(ANSI_FG_RED "Cannot clear faults: LCL has tripped!" ANSI_RESET "\n");
+            printf("LCL-tripping faults require hardware RESET to clear.\n");
+            printf("(In real hardware, this requires cycling power or RESET pin)\n");
+        } else {
+            uint32_t old_faults = g_wheel_state.fault_latch;
+            wheel_model_clear_faults(&g_wheel_state, 0xFFFFFFFF);
+            if (old_faults != 0) {
+                printf(ANSI_FG_GREEN "All faults cleared!" ANSI_RESET "\n");
+                printf("Previous faults: 0x%08X\n", old_faults);
+            } else {
+                printf(ANSI_FG_YELLOW "No faults to clear." ANSI_RESET "\n");
+            }
+        }
+    } else if (key == 'q' || key == 'Q' || key == 27) {
+        // Return to menu (no message)
+    } else {
+        printf(ANSI_FG_YELLOW "Invalid selection. Press 1-7, 0, C, or Q." ANSI_RESET "\n");
+    }
+
+    // Wait for keypress to return
+    if (key != 'q' && key != 'Q' && key != 27) {
+        printf("\nPress any key to return to main menu...");
+        fflush(stdout);
+        // Block until key pressed
+        int return_key;
+        do {
+            return_key = tui_getkey();
+            sleep_ms(10);
+        } while (return_key == PICO_ERROR_TIMEOUT);
+    }
+
+    // Return to main TUI
+    g_tui_state.needs_refresh = true;
 }
 
 // ============================================================================
@@ -243,6 +341,12 @@ static bool tui_handle_browse_input(int key) {
             // Refresh and clear status message
             g_tui_state.status_msg[0] = '\0';
             g_tui_state.needs_refresh = true;
+            return true;
+
+        case 't':
+        case 'T':
+            // Test mode menu
+            tui_show_test_mode_menu();
             return true;
 
         case 'q':
@@ -608,12 +712,28 @@ void tui_print_status_banner(void) {
     const char* status = (speed_rpm == 0) ? "IDLE" : "ACTIVE";
     const char* status_color = (speed_rpm == 0) ? ANSI_FG_GREEN : ANSI_FG_CYAN;
 
+    // Get fault status (check latched faults - these persist until cleared)
+    uint32_t faults = g_wheel_state.fault_latch;
+    const char* fault_color = (faults == 0) ? ANSI_DIM : ANSI_FG_RED;
+
+    // Format fault string (human-readable names)
+    char fault_buf[64];
+    int fault_count = protection_format_fault_string(faults, fault_buf, sizeof(fault_buf));
+
     // Build the status string
-    printf("Status: %s%s" ANSI_RESET " │ Mode: %s%s" ANSI_RESET " │ RPM: %s%lu" ANSI_RESET " │ Current: %s%.2fA" ANSI_RESET " │ Fault: " ANSI_DIM "-" ANSI_RESET,
+    printf("Status: %s%s" ANSI_RESET " │ Mode: %s%s" ANSI_RESET " │ RPM: %s%lu" ANSI_RESET " │ Current: %s%.2fA" ANSI_RESET " │ Fault: %s",
            status_color, status,
            (speed_rpm == 0) ? ANSI_DIM : "", mode_str,
            (speed_rpm == 0) ? ANSI_DIM : ANSI_FG_CYAN, (unsigned long)speed_rpm,
-           (current_ma == 0) ? ANSI_DIM : ANSI_FG_YELLOW, current_a);
+           (current_ma == 0) ? ANSI_DIM : ANSI_FG_YELLOW, current_a,
+           fault_color);
+
+    // Show fault names if any faults, or "-" if none
+    if (fault_count == 0) {
+        printf("-" ANSI_RESET);
+    } else {
+        printf("%s" ANSI_RESET, fault_buf);
+    }
 
     // Pad to end of line
     printf("\n");
@@ -639,7 +759,7 @@ void tui_print_status_bar(const char* message) {
 void tui_print_nav_hints(void) {
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
-            printf(ANSI_DIM "↑↓ : Navigate | → : Expand | ← : Collapse | R : Refresh | Q : Quit" ANSI_RESET "\n");
+            printf(ANSI_DIM "↑↓ : Navigate | → : Expand | ← : Collapse | T : Test Modes | R : Refresh | Q : Quit" ANSI_RESET "\n");
             break;
 
         default:

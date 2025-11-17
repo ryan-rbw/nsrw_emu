@@ -291,6 +291,45 @@ const char* protection_get_fault_name(uint32_t fault_bit) {
     return "UNKNOWN";
 }
 
+int protection_format_fault_string(uint32_t fault_mask, char* buf, size_t buf_size) {
+    if (!buf || buf_size == 0) {
+        return 0;
+    }
+
+    int fault_count = 0;
+    int offset = 0;
+
+    // Iterate through all 8 fault bits
+    for (int i = 0; i < 8; i++) {
+        uint32_t fault_bit = (1U << i);
+
+        if (fault_mask & fault_bit) {
+            // Add comma separator if not the first fault
+            if (fault_count > 0 && offset < buf_size - 1) {
+                buf[offset++] = ',';
+            }
+
+            // Append fault name
+            const char* name = fault_table[i].name;
+            while (*name && offset < buf_size - 1) {
+                buf[offset++] = *name++;
+            }
+
+            fault_count++;
+
+            // Check if buffer is nearly full
+            if (offset >= buf_size - 20) {
+                break;  // Leave room for potential ellipsis or more names
+            }
+        }
+    }
+
+    // Null-terminate
+    buf[offset] = '\0';
+
+    return fault_count;
+}
+
 bool protection_is_latching_fault(uint32_t fault_bit) {
     for (int i = 0; i < 8; i++) {
         if (fault_bit == (1U << i)) {

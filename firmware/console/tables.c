@@ -17,6 +17,7 @@
 #include "table_config.h"
 #include "table_fault_injection.h"
 #include "table_core1_stats.h"
+#include "table_test_modes.h"
 #include <string.h>
 #include <math.h>
 #include <strings.h>  // For strcasecmp
@@ -52,6 +53,7 @@ void catalog_init(void) {
     table_config_init();
     table_fault_injection_init();
     table_core1_stats_init();
+    table_test_modes_init();
 
     printf("[CATALOG] Initialized with %d tables\n", catalog_count);
 }

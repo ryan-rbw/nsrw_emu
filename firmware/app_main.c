@@ -35,6 +35,10 @@
 #include "table_control.h"
 #include "table_fault_injection.h"
 #include "table_core1_stats.h"
+#include "table_test_modes.h"
+
+// Test modes (operating scenarios)
+#include "nss_nrwa_t6_test_modes.h"
 
 // Fault injection
 #include "config/scenario.h"
@@ -85,7 +89,7 @@ static void print_banner(void) {
 // Global State (Shared between cores via core_sync)
 // ============================================================================
 
-static wheel_state_t g_wheel_state;
+wheel_state_t g_wheel_state;  // Non-static for console/test mode access
 static volatile bool g_core1_ready = false;
 
 // ============================================================================
@@ -123,6 +127,10 @@ void core1_main(void) {
     // Initialize protection system
     protection_init(&g_wheel_state);
     printf("[Core1] Protection system initialized\n");
+
+    // Initialize test mode framework
+    test_mode_init();
+    printf("[Core1] Test mode framework initialized\n");
 
     // Set up timebase with callback
     timebase_init(physics_tick_callback);

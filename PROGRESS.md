@@ -2258,6 +2258,148 @@ Focus shifted to clean arrow-key navigation model.
 
 ---
 
+## Post-Phase 10 Enhancements
+
+### Test Mode Framework & UI Improvements (2025-11-17)
+
+**Status**: Complete
+**Commits**: `[pending]`
+
+#### What We Built
+
+**1. Test Mode Framework Enhancement**
+
+Enhanced test mode system with realistic power-on initialization and proper mode transitions:
+
+- **Power-On Initialization** ([firmware/device/nss_nrwa_t6_model.c:302-403](firmware/device/nss_nrwa_t6_model.c))
+  - ICD-compliant initialization sequence
+  - All fault registers cleared to 0x00000000 at power-on
+  - Proper Status register defaults per ICD Tables 12-14 and 12-15
+  - Detailed console output showing initialization state
+
+- **Mode Change State Reset** ([firmware/device/nss_nrwa_t6_model.c:364-459](firmware/device/nss_nrwa_t6_model.c))
+  - Proper cleanup of old mode state before transition
+  - Proper initialization of new mode state after transition
+  - No-op check for same-mode changes
+  - PI controller reset on speed mode changes
+
+- **Test Mode Scenarios** ([firmware/device/nss_nrwa_t6_test_modes.c/h](firmware/device/nss_nrwa_t6_test_modes.c))
+  - 8 predefined test modes for validation
+  - Settling detection with mode-specific tolerances
+  - Integration with physics model
+
+**2. Test Mode TUI Integration**
+
+Added interactive test mode access via console:
+
+- **Table 11: Test Modes** ([firmware/console/table_test_modes.c/h](firmware/console/table_test_modes.c))
+  - Active mode ID display
+  - Test mode activation/deactivation via TUI
+  - Detailed status printing
+
+- **Test Mode Menu** ([firmware/console/tui.c:139-217](firmware/console/tui.c))
+  - Press `T` to enter test mode menu
+  - Activate modes 1-7
+  - Deactivate with `0`
+  - **Clear faults with `C`** (new feature)
+  - Return with `Q`
+
+**3. Human-Readable Fault Display**
+
+Enhanced fault reporting in TUI status banner:
+
+- **Fault String Formatting** ([firmware/device/nss_nrwa_t6_protection.c:294-331](firmware/device/nss_nrwa_t6_protection.c))
+  - New function: `protection_format_fault_string()`
+  - Converts fault bitmask to comma-separated names
+  - Example: `0x00000002` → `"Overspeed"`
+  - Multiple faults: `0x0000000A` → `"Overspeed,Overpower"`
+
+- **Status Banner Enhancement** ([firmware/console/tui.c:698-719](firmware/console/tui.c))
+  - Shows fault names instead of hex values
+  - Color-coded (red for faults, dim for none)
+  - Before: `Fault: 0x00000002`
+  - After: `Fault: Overspeed`
+
+**4. Fault Clearing via TUI**
+
+Added user-friendly fault clearing to test mode menu:
+
+- **Clear Command** (Test Mode Menu, press `C`)
+  - Clears all latched faults (0xFFFFFFFF mask)
+  - LCL protection check (prevents clearing if LCL tripped)
+  - User feedback:
+    - ✅ `All faults cleared!` (green) - if faults were present
+    - ⚠️ `No faults to clear.` (yellow) - if no faults existed
+    - ❌ `Cannot clear faults: LCL has tripped!` (red) - if LCL protection triggered
+
+#### Test Modes Available
+
+| ID | Name | Description | Mode | Setpoint | Fault Expected |
+|----|------|-------------|------|----------|----------------|
+| 1 | SPEED_5000RPM | Soft overspeed limit test | SPEED | 5000 RPM | No (warning) |
+| 2 | SPEED_3000RPM | Nominal operation | SPEED | 3000 RPM | No |
+| 3 | CURRENT_2A | Moderate torque | CURRENT | 2.0 A | No |
+| 4 | TORQUE_50MNM | Momentum building | TORQUE | 50 mN·m | No |
+| 5 | OVERSPEED_FAULT | Trigger overspeed fault | SPEED | 6500 RPM | Yes |
+| 6 | POWER_LIMIT | Power limit test | SPEED | 4500 RPM | No |
+| 7 | ZERO_CROSS | Friction/loss test | SPEED | 0 RPM | No |
+
+#### Fault Name Mappings
+
+| Bit | Hex Value | Fault Name |
+|-----|-----------|------------|
+| 0 | 0x00000001 | Overvoltage |
+| 1 | 0x00000002 | Overspeed |
+| 2 | 0x00000004 | Overduty |
+| 3 | 0x00000008 | Overpower |
+| 4 | 0x00000010 | Motor Overtemp |
+| 5 | 0x00000020 | Electronics Overtemp |
+| 6 | 0x00000040 | Bearing Overtemp |
+| 7 | 0x00000080 | Comms Timeout |
+
+#### Example Workflow
+
+1. **Activate test mode**: Press `T` → Press `5` (OVERSPEED_FAULT)
+2. **Wait for fault**: Banner shows `Fault: Overspeed` (red)
+3. **Deactivate test**: Press `0`
+4. **Clear fault**: Press `C`
+5. **Verify**: Banner shows `Fault: -` (dim)
+
+#### Files Modified
+
+| File | Changes | Purpose |
+|------|---------|---------|
+| [firmware/device/nss_nrwa_t6_model.c](firmware/device/nss_nrwa_t6_model.c) | Enhanced init & mode change | ICD-compliant power-on, proper state transitions |
+| [firmware/device/nss_nrwa_t6_test_modes.c](firmware/device/nss_nrwa_t6_test_modes.c) | New file (275 lines) | Test mode framework implementation |
+| [firmware/device/nss_nrwa_t6_test_modes.h](firmware/device/nss_nrwa_t6_test_modes.h) | New file (124 lines) | Test mode API declarations |
+| [firmware/device/nss_nrwa_t6_protection.c](firmware/device/nss_nrwa_t6_protection.c) | Added fault string formatting | Human-readable fault names |
+| [firmware/device/nss_nrwa_t6_protection.h](firmware/device/nss_nrwa_t6_protection.h) | Added API declaration | Fault formatting function |
+| [firmware/console/table_test_modes.c](firmware/console/table_test_modes.c) | New file (180 lines) | Test mode TUI table |
+| [firmware/console/table_test_modes.h](firmware/console/table_test_modes.h) | New file (48 lines) | Table API |
+| [firmware/console/tui.c](firmware/console/tui.c) | Test mode menu + fault display | Interactive test control, readable faults |
+| [firmware/app_main.c](firmware/app_main.c) | Made g_wheel_state non-static | TUI access to wheel state |
+| [firmware/CMakeLists.txt](firmware/CMakeLists.txt) | Added test mode files | Build integration |
+
+**Total**: ~827 new lines (production code)
+
+#### Build Metrics
+
+**Build** (2025-11-17):
+- Flash usage: 117,504 bytes (45.9% of 256 KB)
+- UF2 size: 230 KB
+- Build time: ~5s (incremental)
+- Status: ✅ All files compile successfully
+
+#### Benefits
+
+1. **Easier Testing**: No need for NSP commands to test fault scenarios
+2. **Better Debugging**: Human-readable fault names in banner
+3. **Realistic Operation**: Proper power-on and mode transitions
+4. **User-Friendly**: Clear faults with single keypress
+5. **Production-Ready**: Matches ICD specifications
+
+---
+
 ## Metrics
 
 | Metric | Current | Target | Status |

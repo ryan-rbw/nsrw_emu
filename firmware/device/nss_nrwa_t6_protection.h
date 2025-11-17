@@ -149,6 +149,19 @@ const char* protection_get_param_units(uint8_t param_id);
 const char* protection_get_fault_name(uint32_t fault_bit);
 
 /**
+ * @brief Format multiple fault names from bitmask
+ *
+ * Iterates through all fault bits and builds a comma-separated string
+ * of active fault names (e.g., "OVERSPEED,OVERPOWER").
+ *
+ * @param fault_mask Fault bitmask (may have multiple bits set)
+ * @param buf Output buffer for fault string
+ * @param buf_size Size of output buffer
+ * @return Number of faults found (0 if none)
+ */
+int protection_format_fault_string(uint32_t fault_mask, char* buf, size_t buf_size);
+
+/**
  * @brief Check if fault is latching type
  *
  * Latching faults require CLEAR-FAULT to reset.

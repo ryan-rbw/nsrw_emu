@@ -300,23 +300,106 @@ static void control_mode_pwm(wheel_state_t* state) {
 // ============================================================================
 
 void wheel_model_init(wheel_state_t* state) {
-    // Zero all state
+    // Zero all state (simulate power-on RAM clear)
     memset(state, 0, sizeof(wheel_state_t));
 
-    // Set default control mode
+    // ========================================================================
+    // Power-On Initialization Sequence (per ICD Section 10)
+    // ========================================================================
+
+    // Default control mode: CURRENT (safest mode on startup)
     state->mode = CONTROL_MODE_CURRENT;
     state->direction = DIRECTION_POSITIVE;
 
     // Initialize protection system with default thresholds
+    // Per SPEC.md §13: All protections enabled by default
     protection_init(state);
 
-    // Set default PI parameters
+    // Default PI controller parameters (for SPEED mode)
     state->pi_kp = DEFAULT_PI_KP;
     state->pi_ki = DEFAULT_PI_KI;
     state->pi_i_max_a = DEFAULT_PI_I_MAX_A;
 
-    // Simulated bus voltage (constant for now)
-    state->voltage_v = 28.0f;  // Typical 28V bus
+    // Simulated bus voltage (nominal 28V satellite bus)
+    state->voltage_v = 28.0f;
+
+    // ========================================================================
+    // Status Register Initialization (ICD Table 12-14)
+    // ========================================================================
+    // Note: Status register bits are read from wheel_state_t fields in telemetry
+    // We don't have a dedicated status_register field, but these state variables
+    // map to status bits:
+    //
+    // - fault_status = 0 (no active faults at power-on)
+    // - fault_latch = 0 (no latched faults at power-on)
+    // - warning_status = 0 (no warnings at power-on)
+    // - lcl_tripped = false (LCL not tripped)
+    // - current_out_a = 0.0 (drive in High-Z state)
+    // - omega_rad_s = 0.0 (wheel at rest)
+    //
+    // ICD Table 12-14 expected bits at power-on:
+    // - Bit 0: RAM boot state = 1 (after init completes)
+    // - Bits 22-28: PGOOD flags = all 1 (supplies OK)
+    // - Bit 9: Drive state = 0 (High-Z until commanded)
+    // - Protection bits = 0 (not disabled, i.e., enabled)
+    //
+    // These are handled implicitly by the zero-init above and will be
+    // reflected correctly in telemetry blocks.
+
+    // ========================================================================
+    // Fault Register Initialization (ICD Table 12-15)
+    // ========================================================================
+    // Per ICD: Fault register should be 0x00000000 at power-on
+    state->fault_status = 0x00000000;  // No active faults
+    state->fault_latch = 0x00000000;   // No latched faults
+    state->warning_status = 0x00000000;  // No warnings
+
+    // ========================================================================
+    // Command Setpoints (all zero at power-on)
+    // ========================================================================
+    state->current_cmd_a = 0.0f;
+    state->speed_cmd_rpm = 0.0f;
+    state->torque_cmd_mnm = 0.0f;
+    state->pwm_duty_pct = 0.0f;
+
+    // ========================================================================
+    // Output State (High-Z / disabled at power-on)
+    // ========================================================================
+    state->current_out_a = 0.0f;  // Motor output disabled
+    state->torque_out_mnm = 0.0f;
+    state->power_w = 0.0f;
+
+    // ========================================================================
+    // Dynamic State (wheel at rest at power-on)
+    // ========================================================================
+    state->omega_rad_s = 0.0f;     // Wheel stopped
+    state->momentum_nms = 0.0f;    // Zero momentum
+    state->alpha_rad_s2 = 0.0f;    // Zero acceleration
+    state->torque_loss_mnm = 0.0f;
+
+    // ========================================================================
+    // Controller State (clean slate)
+    // ========================================================================
+    state->pi_error_integral = 0.0f;
+    state->pi_output_a = 0.0f;
+
+    // ========================================================================
+    // Protection State
+    // ========================================================================
+    state->lcl_tripped = false;  // LCL not tripped at power-on
+
+    // ========================================================================
+    // Statistics
+    // ========================================================================
+    state->tick_count = 0;
+    state->uptime_seconds = 0;
+
+    printf("[WHEEL] Power-on initialization complete\n");
+    printf("  Mode: CURRENT (High-Z)\n");
+    printf("  All faults cleared: 0x%08X\n", state->fault_latch);
+    printf("  All protections enabled: 0x%08X\n", state->protection_enable);
+    printf("  Wheel at rest: ω=%.3f rad/s, H=%.6f N·m·s\n",
+           state->omega_rad_s, state->momentum_nms);
 }
 
 void wheel_model_tick(wheel_state_t* state) {
@@ -362,13 +445,100 @@ void wheel_model_tick(wheel_state_t* state) {
 }
 
 void wheel_model_set_mode(wheel_state_t* state, control_mode_t mode) {
+    control_mode_t old_mode = state->mode;
+
+    // No-op if already in this mode
+    if (old_mode == mode) {
+        return;
+    }
+
+    printf("[WHEEL] Mode change: %d → %d\n", old_mode, mode);
+
+    // ========================================================================
+    // Reset State on Mode Exit
+    // ========================================================================
+    // Clear controller state from the OLD mode to prevent stale values
+    // from affecting the NEW mode's operation
+
+    switch (old_mode) {
+        case CONTROL_MODE_CURRENT:
+            // Clear current command setpoint
+            state->current_cmd_a = 0.0f;
+            break;
+
+        case CONTROL_MODE_SPEED:
+            // Clear speed command and reset PI controller
+            state->speed_cmd_rpm = 0.0f;
+            state->pi_error_integral = 0.0f;
+            state->pi_output_a = 0.0f;
+            printf("  [SPEED] PI controller reset\n");
+            break;
+
+        case CONTROL_MODE_TORQUE:
+            // Clear torque command
+            state->torque_cmd_mnm = 0.0f;
+            break;
+
+        case CONTROL_MODE_PWM:
+            // Clear PWM duty cycle command
+            state->pwm_duty_pct = 0.0f;
+            break;
+
+        default:
+            break;
+    }
+
+    // ========================================================================
+    // Mode Transition
+    // ========================================================================
     state->mode = mode;
 
-    // Reset PI controller state when entering/leaving SPEED mode
-    if (mode == CONTROL_MODE_SPEED) {
-        state->pi_error_integral = 0.0f;
-        state->pi_output_a = 0.0f;
+    // ========================================================================
+    // Initialize State on Mode Entry
+    // ========================================================================
+    // Set up controller state for the NEW mode
+
+    switch (mode) {
+        case CONTROL_MODE_CURRENT:
+            // Current mode: Direct control, no special init needed
+            // Output will be driven by current_cmd_a (currently 0)
+            printf("  [CURRENT] Direct current control active\n");
+            break;
+
+        case CONTROL_MODE_SPEED:
+            // Speed mode: Initialize PI controller with clean state
+            state->pi_error_integral = 0.0f;
+            state->pi_output_a = 0.0f;
+            printf("  [SPEED] PI controller initialized (Kp=%.3f, Ki=%.3f)\n",
+                   state->pi_kp, state->pi_ki);
+            break;
+
+        case CONTROL_MODE_TORQUE:
+            // Torque mode: Feed-forward control, no special init needed
+            printf("  [TORQUE] Feed-forward torque control active\n");
+            break;
+
+        case CONTROL_MODE_PWM:
+            // PWM mode: Backup duty-cycle control
+            printf("  [PWM] Direct duty-cycle control active\n");
+            break;
+
+        default:
+            // Invalid mode - force to safe state (CURRENT with zero output)
+            state->mode = CONTROL_MODE_CURRENT;
+            state->current_cmd_a = 0.0f;
+            state->current_out_a = 0.0f;
+            printf("  [ERROR] Invalid mode %d, forced to CURRENT\n", mode);
+            break;
     }
+
+    // ========================================================================
+    // Common Reset on Any Mode Change
+    // ========================================================================
+    // Ensure output current transitions smoothly (no instantaneous jumps)
+    // The new mode's control law will take over on the next tick
+    // For now, we keep current_out_a as-is to avoid discontinuities
+    // (the control law will ramp it appropriately)
 }
 
 void wheel_model_set_speed(wheel_state_t* state, float speed_rpm) {

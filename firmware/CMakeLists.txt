@@ -23,6 +23,8 @@ add_executable(nrwa_t6_emulator
     device/nss_nrwa_t6_telemetry.c
     # Protection system (Phase 7)
     device/nss_nrwa_t6_protection.c
+    # Test modes (operating scenarios)
+    device/nss_nrwa_t6_test_modes.c
     # Fault injection (Phase 9)
     config/json_loader.c
     config/scenario.c
@@ -45,6 +47,7 @@ add_executable(nrwa_t6_emulator
     console/table_config.c
     console/table_fault_injection.c
     console/table_core1_stats.c
+    console/table_test_modes.c
 )
 
 # Pass version string as compile definition
