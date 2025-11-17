@@ -12,6 +12,7 @@
 #include "console_config.h"
 #include "console_format.h"
 #include "table_control.h"
+#include "util/core_sync.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -255,6 +256,45 @@ static bool tui_handle_browse_input(int key) {
     return false;
 }
 
+/**
+ * @brief Send control command to Core1 based on field ID
+ *
+ * Maps Table 4 (Control) field IDs to Core1 command mailbox commands.
+ * This bridges TUI edits to the physics engine running on Core1.
+ *
+ * @param field_id Field ID from table definition
+ * @param value Parsed value (uint32_t representation)
+ * @return true if command was sent, false if not a control field or mailbox full
+ */
+static bool tui_send_control_command(uint32_t field_id, uint32_t value) {
+    // Table 4 (Control Mode) field IDs: 401-406
+    switch (field_id) {
+        case 401:  // mode (ENUM: CURRENT=0, SPEED=1, TORQUE=2, PWM=3)
+            return core_sync_send_command(CMD_SET_MODE, (float)value, 0.0f);
+
+        case 402:  // speed_rpm (U32 in RPM)
+            return core_sync_send_command(CMD_SET_SPEED, (float)value, 0.0f);
+
+        case 403:  // current_ma (U32 in mA, convert to A)
+            return core_sync_send_command(CMD_SET_CURRENT, (float)value / 1000.0f, 0.0f);
+
+        case 404:  // torque_mnm (U32 in mN·m)
+            return core_sync_send_command(CMD_SET_TORQUE, (float)value, 0.0f);
+
+        case 405:  // pwm_pct (U32 in %, convert to 0.0-1.0)
+            return core_sync_send_command(CMD_SET_PWM, (float)value / 100.0f, 0.0f);
+
+        case 406:  // direction (ENUM: POSITIVE=0, NEGATIVE=1)
+            // Direction is handled by mode commands (param2 could be used for direction)
+            // For now, just update local state - physics will use sign of setpoints
+            return false;
+
+        default:
+            // Not a control field - no command to send
+            return false;
+    }
+}
+
 static bool tui_handle_edit_input(int key) {
     // Get currently selected field
     const table_meta_t* table = catalog_get_table_by_index(g_tui_state.selected_table_idx);
@@ -321,12 +361,20 @@ static bool tui_handle_edit_input(int key) {
                             *(volatile uint32_t*)field->ptr = value;
                         }
 
+                        // Send command to Core1 if this is a control field
+                        bool cmd_sent = tui_send_control_command(field->id, value);
+
                         // Format value for display
                         char value_str[32];
                         catalog_format_value(field, value, value_str, sizeof(value_str));
 
-                        snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
-                                 "Saved: %s = %s", field->name, value_str);
+                        if (cmd_sent) {
+                            snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                     "Command sent: %s = %s", field->name, value_str);
+                        } else {
+                            snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
+                                     "Saved: %s = %s", field->name, value_str);
+                        }
                     } else {
                         snprintf(g_tui_state.status_msg, sizeof(g_tui_state.status_msg),
                                  "Error: No pointer for field");

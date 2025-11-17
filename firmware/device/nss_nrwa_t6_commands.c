@@ -9,6 +9,7 @@
 #include "nss_nrwa_t6_protection.h"
 #include "fixedpoint.h"
 #include "unaligned.h"
+#include "util/core_sync.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -175,41 +176,44 @@ static bool write_register(uint16_t addr, const uint8_t* value) {
     uint32_t val32 = read_u32_le(value);
     printf("[DEBUG] write_register: addr=0x%04X, val32=0x%08X\n", addr, val32);
 
-    // Map register addresses to wheel state fields
+    // CRITICAL: Send commands to Core1 via command mailbox instead of
+    // modifying Core0's wheel_state copy. Core1 is the source of truth!
     switch (addr) {
         case REG_CONTROL_MODE:
-            printf("[DEBUG] REG_CONTROL_MODE case entered, val32=%u, CONTROL_MODE_PWM=%u\n",
-                   val32, CONTROL_MODE_PWM);
+            printf("[DEBUG] REG_CONTROL_MODE: sending CMD_SET_MODE to Core1\n");
             if (val32 <= CONTROL_MODE_PWM) {
-                wheel_model_set_mode(g_wheel_state, (control_mode_t)val32);
-                printf("[DEBUG] wheel_model_set_mode() called successfully\n");
-                return true;
+                bool sent = core_sync_send_command(CMD_SET_MODE, (float)val32, 0.0f);
+                printf("[DEBUG] CMD_SET_MODE sent=%d\n", sent);
+                return sent;
             }
-            printf("[DEBUG] val32 > CONTROL_MODE_PWM, returning false\n");
-            return false;  // Invalid mode
+            printf("[DEBUG] Invalid mode value %u\n", val32);
+            return false;
 
         case REG_SPEED_SETPOINT_RPM:
-            wheel_model_set_speed(g_wheel_state, uq14_18_to_float(val32));
-            return true;
+            printf("[DEBUG] REG_SPEED_SETPOINT_RPM: sending CMD_SET_SPEED to Core1\n");
+            return core_sync_send_command(CMD_SET_SPEED, uq14_18_to_float(val32), 0.0f);
 
         case REG_CURRENT_SETPOINT_MA:
-            wheel_model_set_current(g_wheel_state, uq18_14_to_float(val32) / 1000.0f);
-            return true;
+            printf("[DEBUG] REG_CURRENT_SETPOINT_MA: sending CMD_SET_CURRENT to Core1\n");
+            return core_sync_send_command(CMD_SET_CURRENT, uq18_14_to_float(val32) / 1000.0f, 0.0f);
 
         case REG_TORQUE_SETPOINT_MNM:
-            wheel_model_set_torque(g_wheel_state, uq18_14_to_float(val32));
-            return true;
+            printf("[DEBUG] REG_TORQUE_SETPOINT_MNM: sending CMD_SET_TORQUE to Core1\n");
+            return core_sync_send_command(CMD_SET_TORQUE, uq18_14_to_float(val32), 0.0f);
 
         case REG_PWM_DUTY_CYCLE:
-            wheel_model_set_pwm(g_wheel_state, uq16_16_to_float(val32));
-            return true;
+            printf("[DEBUG] REG_PWM_DUTY_CYCLE: sending CMD_SET_PWM to Core1\n");
+            return core_sync_send_command(CMD_SET_PWM, uq16_16_to_float(val32), 0.0f);
 
         case REG_DIRECTION:
+            printf("[DEBUG] REG_DIRECTION: value %u (not sent as separate command)\n", val32);
+            // Direction is encoded in sign of setpoints, not a separate command
+            // Update local state for display only
             if (val32 <= DIRECTION_NEGATIVE) {
                 wheel_model_set_direction(g_wheel_state, (direction_t)val32);
                 return true;
             }
-            return false;  // Invalid direction
+            return false;
 
         default:
             // Unknown or read-only register
