@@ -1,8 +1,13 @@
 /**
  * @file table_telemetry.c
- * @brief Telemetry Blocks Table Implementation
+ * @brief NSP Telemetry Table Implementation
  *
- * Table 7: Telemetry Blocks (decoded STANDARD/TEMP/VOLT/CURR/DIAG)
+ * Table 7: NSP Telemetry Status (for RS-485 telemetry blocks)
+ *
+ * This table tracks NSP telemetry block metadata (sequence numbers,
+ * timestamps, packet counts) when RS-485 is active.
+ *
+ * NOTE: For live physics values, see Table 10 (Core1 Physics Stats).
  */
 
 #include "table_telemetry.h"
@@ -10,15 +15,15 @@
 #include <stdio.h>
 
 // ============================================================================
-// Live Data (Stubs - will be connected to telemetry system in future)
+// NSP Telemetry Metadata (Stubs - will be connected when RS-485 is active)
 // ============================================================================
 
-static volatile uint32_t telem_block_id = 0;           // Last block ID
-static volatile uint32_t telem_uptime_s = 0;           // Uptime (seconds)
-static volatile uint32_t telem_temp_c = 25000;         // Temperature (mC)
-static volatile uint32_t telem_voltage_v = 28000;      // Bus voltage (mV)
-static volatile uint32_t telem_current_ma = 0;         // Current (mA)
-static volatile uint32_t telem_speed_rpm = 0;          // Speed (RPM)
+static volatile uint32_t telem_last_block_id = 0;      // Last received NSP block ID
+static volatile uint32_t telem_sequence_num = 0;       // Sequence number
+static volatile uint32_t telem_rx_count = 0;           // Total blocks received
+static volatile uint32_t telem_tx_count = 0;           // Total blocks transmitted
+static volatile uint32_t telem_last_rx_time_ms = 0;    // Last RX timestamp (ms)
+static volatile uint32_t telem_last_tx_time_ms = 0;    // Last TX timestamp (ms)
 
 // ============================================================================
 // Field Definitions
@@ -27,72 +32,72 @@ static volatile uint32_t telem_speed_rpm = 0;          // Speed (RPM)
 static const field_meta_t telemetry_fields[] = {
     {
         .id = 701,
-        .name = "block_id",
+        .name = "last_block_id",
         .type = FIELD_TYPE_HEX,
         .units = "",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&telem_block_id,
+        .ptr = (volatile uint32_t*)&telem_last_block_id,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 702,
-        .name = "uptime_s",
+        .name = "sequence_num",
         .type = FIELD_TYPE_U32,
-        .units = "s",
+        .units = "",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&telem_uptime_s,
+        .ptr = (volatile uint32_t*)&telem_sequence_num,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 703,
-        .name = "temp_c",
+        .name = "rx_count",
         .type = FIELD_TYPE_U32,
-        .units = "mC",
+        .units = "blocks",
         .access = FIELD_ACCESS_RO,
-        .default_val = 25000,
-        .ptr = (volatile uint32_t*)&telem_temp_c,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&telem_rx_count,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 704,
-        .name = "voltage_v",
+        .name = "tx_count",
         .type = FIELD_TYPE_U32,
-        .units = "mV",
+        .units = "blocks",
         .access = FIELD_ACCESS_RO,
-        .default_val = 28000,
-        .ptr = (volatile uint32_t*)&telem_voltage_v,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&telem_tx_count,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 705,
-        .name = "current_ma",
+        .name = "last_rx_time_ms",
         .type = FIELD_TYPE_U32,
-        .units = "mA",
+        .units = "ms",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&telem_current_ma,
+        .ptr = (volatile uint32_t*)&telem_last_rx_time_ms,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 706,
-        .name = "speed_rpm",
+        .name = "last_tx_time_ms",
         .type = FIELD_TYPE_U32,
-        .units = "RPM",
+        .units = "ms",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&telem_speed_rpm,
+        .ptr = (volatile uint32_t*)&telem_last_tx_time_ms,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
@@ -105,8 +110,8 @@ static const field_meta_t telemetry_fields[] = {
 
 static const table_meta_t telemetry_table = {
     .id = 7,
-    .name = "Telemetry Status",
-    .description = "Decoded telemetry (STANDARD/TEMP/VOLT/CURR)",
+    .name = "NSP Telemetry",
+    .description = "RS-485 telemetry block metadata (sequence, counts)",
     .fields = telemetry_fields,
     .field_count = sizeof(telemetry_fields) / sizeof(telemetry_fields[0]),
 };

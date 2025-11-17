@@ -3,6 +3,7 @@
 # Main executable
 add_executable(nrwa_t6_emulator
     app_main.c
+    nsp_handler.c
     # Platform layer
     platform/gpio_map.c
     platform/timebase.c
@@ -13,6 +14,7 @@ add_executable(nrwa_t6_emulator
     drivers/nsp.c
     # Utilities (Phase 4)
     util/ringbuf.c
+    util/core_sync.c
     # Device model (Phase 5)
     device/nss_nrwa_t6_regs.c
     device/nss_nrwa_t6_model.c
@@ -37,12 +39,12 @@ add_executable(nrwa_t6_emulator
     console/table_serial.c
     console/table_nsp.c
     console/table_control.c
-    console/table_dynamics.c
     console/table_protection_limits.c
     console/table_protection_status.c
     console/table_telemetry.c
     console/table_config.c
     console/table_fault_injection.c
+    console/table_core1_stats.c
 )
 
 # Pass version string as compile definition
@@ -78,17 +80,26 @@ target_include_directories(nrwa_t6_emulator PRIVATE
 target_link_libraries(nrwa_t6_emulator
     pico_stdlib          # Standard library (stdio, time, etc.)
     pico_multicore       # Dual-core support
+    pico_sync            # Spinlocks and synchronization
     hardware_uart        # UART driver
     hardware_gpio        # GPIO driver
     hardware_timer       # Hardware timers
     hardware_irq         # Interrupt handling
     hardware_flash       # Flash access (for scenarios)
+    hardware_sync        # Hardware sync primitives
     pico_unique_id       # Unique board ID
 )
 
 # Enable USB output, disable UART output (we need UART1 for RS-485)
 pico_enable_stdio_usb(nrwa_t6_emulator 1)
 pico_enable_stdio_uart(nrwa_t6_emulator 0)
+
+# Enable float support in printf (required for Table 10 physics stats)
+target_compile_definitions(nrwa_t6_emulator PRIVATE
+    PICO_PRINTF_SUPPORT_FLOAT=1
+    PICO_PRINTF_SUPPORT_LONG_LONG=1
+    PICO_PRINTF_SUPPORT_PTRDIFF_T=1
+)
 
 # Create map/bin/hex/uf2 files
 # Disabled - using system picotool for manual UF2 conversion (see build.sh)

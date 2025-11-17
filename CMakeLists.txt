@@ -24,7 +24,7 @@ execute_process(
 )
 
 if(NOT GIT_VERSION)
-    set(GIT_VERSION "v0.1.0-dev")
+    set(GIT_VERSION "v0.1.0-dev-PHASE10-TEST")
 endif()
 
 message(STATUS "Building NRWA-T6 Emulator ${GIT_VERSION}")

@@ -16,6 +16,14 @@
 void table_control_init(void);
 
 /**
+ * @brief Update control table with latest telemetry from Core1
+ *
+ * Call this periodically from main loop to keep values synchronized
+ * with live physics state.
+ */
+void table_control_update(void);
+
+/**
  * @brief Get current control mode
  * @return Control mode (0=CURRENT, 1=SPEED, 2=TORQUE, 3=PWM)
  */

@@ -915,13 +915,98 @@ void core1_main() {
 ```
 
 #### 10.3 Synchronization
-- **Spinlock**: Protect command mailbox (Core0 writes, Core1 reads)
-- **Ring buffer**: Telemetry snapshots (Core1 writes, Core0 reads)
-- **Memory barriers**: Ensure visibility across cores
+- **Spinlock (Commands)**: Protect command mailbox (Core0 writes, Core1 reads)
+- **Spinlock (Telemetry)**: Protect telemetry snapshot (Core1 writes, Core0 reads)
+  - **NOTE**: Changed from ring buffer to simple spinlock-protected single snapshot
+  - Simpler than SPSC ring buffer, adequate for 20 Hz Core0 reads vs 100 Hz Core1 writes
+  - Always get latest data, no stale samples
+- **Memory barriers**: `__dmb()` after spinlock operations for cross-core visibility
 
 #### 10.4 Watchdog
-- Enable WDT with 1s timeout
-- Pet from both cores to detect hangs
+- Enable WDT with 8s timeout
+- Pet from Core0 main loop only
+- **IMPORTANT**: Enable watchdog AFTER boot tests complete (tests can take >8s)
+  ```c
+  // app_main.c - Enable watchdog AFTER test completion, not at init
+  run_all_checkpoint_tests();
+  wait_for_keypress();
+  watchdog_enable(8000, true);  // Enable here, NOT before tests
+  ```
+
+#### 10.5 Critical Implementation Notes (Lessons Learned)
+
+**Float Printf Support (REQUIRED)**:
+```cmake
+# CMakeLists.txt - MANDATORY for TUI float display
+target_compile_definitions(nrwa_t6_emulator PRIVATE
+    PICO_PRINTF_SUPPORT_FLOAT=1
+)
+```
+Without this, `printf("%.2f", float_val)` causes undefined behavior (lockup/crash).
+
+**Static Buffer Initialization (CRITICAL)**:
+```c
+// table_core1_stats.c - Must explicitly zero-initialize
+static telemetry_snapshot_t g_display_snapshot = {0};  // NOT just {}, must be {0}!
+```
+C does not guarantee zero-initialization of static structs without `= {0}`. Uninitialized buffers contain garbage that causes TUI crashes when dereferenced.
+
+**NaN/Inf Safety (DEFENSIVE)**:
+```c
+// tables.c - catalog_format_value() for FIELD_TYPE_FLOAT
+if (isnan(f)) {
+    snprintf(buf, buflen, "NaN");
+} else if (isinf(f)) {
+    snprintf(buf, buflen, f > 0 ? "+Inf" : "-Inf");
+} else {
+    snprintf(buf, buflen, "%.2f", f);
+}
+```
+Prevents printf lockup on invalid float values from uninitialized memory or physics edge cases.
+
+**Double-Buffer Pattern (RACE CONDITION FIX)**:
+```c
+// Prevent TUI from reading partially-updated telemetry
+uint32_t save = save_and_disable_interrupts();
+g_display_snapshot = g_update_buffer;  // Atomic struct copy
+restore_interrupts(save);
+```
+Without interrupt disabling during struct copy, TUI can read torn/inconsistent data.
+
+**Memory Alignment Safety (CRITICAL)**:
+```c
+// tui.c - Reading FLOAT fields from telemetry snapshot
+else if (field->type == FIELD_TYPE_FLOAT) {
+    // Use memcpy to avoid alignment faults - NEVER dereference through cast pointer
+    float f;
+    memcpy(&f, (const void*)field->ptr, sizeof(float));
+    memcpy(&value, &f, sizeof(uint32_t));
+}
+```
+
+```c
+// tui.c - Reading ENUM/BOOL fields (may be 1-byte with padding)
+else if (field->type == FIELD_TYPE_ENUM) {
+    // Read only actual enum size (1 byte), then zero-extend to uint32_t
+    value = 0;
+    uint8_t enum_val;
+    memcpy(&enum_val, (const void*)field->ptr, sizeof(uint8_t));
+    value = (uint32_t)enum_val;
+}
+```
+
+**Why this matters**: ARM Cortex-M0+ triggers hard faults on misaligned memory access. When `field->ptr` points to a `float` or `enum` in a struct, casting to `(volatile uint32_t*)` and dereferencing can access unaligned memory, causing complete system freeze (LED stops, watchdog eventually fires). `memcpy()` handles unaligned reads safely byte-by-byte when necessary.
+
+**Symptoms of alignment bugs**:
+- System freezes when rendering specific table fields
+- Heartbeat LED stops (indicates hard fault, not just TUI hang)
+- ENUM fields show `INVALID(0xBDADADA0)` (reading garbage beyond 1-byte enum)
+- No stack trace or error message (CPU in fault handler loop)
+
+**Prevention**:
+- Use `memcpy()` for all float, enum, and bool field reads from shared structs
+- Never cast non-uint32_t pointers to `(uint32_t*)` and dereference
+- Test table rendering on hardware (alignment issues don't appear in QEMU)
 
 **Deliverables**:
 - Complete `app_main.c`

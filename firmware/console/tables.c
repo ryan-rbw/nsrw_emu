@@ -11,13 +11,14 @@
 #include "table_serial.h"
 #include "table_nsp.h"
 #include "table_control.h"
-#include "table_dynamics.h"
 #include "table_protection_limits.h"
 #include "table_protection_status.h"
 #include "table_telemetry.h"
 #include "table_config.h"
 #include "table_fault_injection.h"
+#include "table_core1_stats.h"
 #include <string.h>
+#include <math.h>
 #include <strings.h>  // For strcasecmp
 #include <stdio.h>
 #include <stdlib.h>   // For atoi
@@ -45,12 +46,12 @@ void catalog_init(void) {
     table_serial_init();
     table_nsp_init();
     table_control_init();
-    table_dynamics_init();
     table_protection_limits_init();
     table_protection_status_init();
     table_telemetry_init();
     table_config_init();
     table_fault_injection_init();
+    table_core1_stats_init();
 
     printf("[CATALOG] Initialized with %d tables\n", catalog_count);
 }
@@ -222,7 +223,14 @@ void catalog_format_value(const field_meta_t* field, uint32_t value, char* buf, 
             {
                 float f;
                 memcpy(&f, &value, sizeof(float));
-                snprintf(buf, buflen, "%.2f", f);
+                // Check for NaN/Inf to prevent printf lockup
+                if (isnan(f)) {
+                    snprintf(buf, buflen, "NaN");
+                } else if (isinf(f)) {
+                    snprintf(buf, buflen, f > 0 ? "+Inf" : "-Inf");
+                } else {
+                    snprintf(buf, buflen, "%.2f", f);
+                }
             }
             break;
 

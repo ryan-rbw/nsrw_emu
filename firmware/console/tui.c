@@ -19,6 +19,14 @@
 #include "pico/stdlib.h"
 #include "pico/time.h"
 
+// Firmware version and build info (from CMake)
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "v0.1.0-dev"
+#endif
+
+#define BUILD_DATE __DATE__
+#define BUILD_TIME __TIME__
+
 // ============================================================================
 // Global State
 // ============================================================================
@@ -304,7 +312,14 @@ static bool tui_handle_edit_input(int key) {
                 if (catalog_parse_value(field, g_tui_state.input_buf, &value)) {
                     // Valid value - write to field
                     if (field->ptr) {
-                        *(volatile uint32_t*)field->ptr = value;
+                        // CRITICAL: For FLOAT type, use memcpy to avoid alignment issues
+                        if (field->type == FIELD_TYPE_FLOAT) {
+                            float f;
+                            memcpy(&f, &value, sizeof(float));
+                            memcpy((void*)field->ptr, &f, sizeof(float));
+                        } else {
+                            *(volatile uint32_t*)field->ptr = value;
+                        }
 
                         // Format value for display
                         char value_str[32];
@@ -413,11 +428,38 @@ void tui_render_browse(void) {
                     format_field_display_name(field->name, display_name, sizeof(display_name));
 
                     if (field->ptr) {
-                        // For STRING type, pass the pointer value itself (address of string)
-                        // For other types, pass the dereferenced value
-                        uint32_t value = (field->type == FIELD_TYPE_STRING)
-                            ? (uint32_t)field->ptr
-                            : *field->ptr;
+                        uint32_t value;
+
+                        if (field->type == FIELD_TYPE_STRING) {
+                            // For STRING type, pass the pointer value itself (address of string)
+                            value = (uint32_t)field->ptr;
+                        } else if (field->type == FIELD_TYPE_FLOAT) {
+                            // CRITICAL: For FLOAT type, use memcpy to avoid alignment issues
+                            // The ptr points to a float, not a uint32_t. Dereferencing through
+                            // uint32_t* causes strict aliasing violations and alignment faults.
+                            float f;
+                            memcpy(&f, (const void*)field->ptr, sizeof(float));
+                            memcpy(&value, &f, sizeof(uint32_t));
+                        } else if (field->type == FIELD_TYPE_ENUM) {
+                            // CRITICAL: For ENUM types, zero-extend from actual enum size
+                            // C enums are implementation-defined size (often 1-4 bytes)
+                            // We must read only the actual enum bytes, then zero-extend to uint32_t
+                            value = 0;  // Zero-initialize
+                            // Read only 1 byte (most enums are 8-bit when values fit in 0-255)
+                            uint8_t enum_val;
+                            memcpy(&enum_val, (const void*)field->ptr, sizeof(uint8_t));
+                            value = (uint32_t)enum_val;
+                        } else if (field->type == FIELD_TYPE_BOOL) {
+                            // CRITICAL: For BOOL types, read as single byte
+                            value = 0;
+                            uint8_t bool_val;
+                            memcpy(&bool_val, (const void*)field->ptr, sizeof(uint8_t));
+                            value = (uint32_t)bool_val;
+                        } else {
+                            // For other types, dereference normally
+                            value = *field->ptr;
+                        }
+
                         catalog_format_value(field, value, value_str, sizeof(value_str));
                     } else {
                         snprintf(value_str, sizeof(value_str), "N/A");
@@ -465,13 +507,14 @@ void tui_print_header(void) {
     printf("%s", LOGO_ART);
 
     // Format header info to fit exactly 80 characters
-    // Format: "NRWA-T6 Emulator    |    Uptime: HH:MM:SS    |    Tests: N/M ✓/✗"
+    // Line 1: "NRWA-T6 Emulator VERSION    |    Uptime: HH:MM:SS    |    Tests: N/M ✓/✗"
     int written = snprintf(header_buf, sizeof(header_buf),
-                           ANSI_BOLD ANSI_FG_CYAN "NRWA-T6 Emulator" ANSI_RESET
+                           ANSI_BOLD ANSI_FG_CYAN "NRWA-T6 Emulator " ANSI_RESET ANSI_DIM "%s" ANSI_RESET
                            "    |    "
                            "Uptime: %02lu:%02lu:%02lu"
                            "    |    "
                            "Tests: %d/%d %s",
+                           FIRMWARE_VERSION,
                            uptime_sec / 3600,
                            (uptime_sec % 3600) / 60,
                            uptime_sec % 60,
@@ -479,7 +522,7 @@ void tui_print_header(void) {
                            g_test_results.total_tests,
                            g_test_results.all_passed ? ANSI_FG_GREEN "✓" ANSI_RESET : ANSI_FG_RED "✗" ANSI_RESET);
 
-    // Print header with padding to fill 80 characters
+    // Print header line 1
     printf("%s", header_buf);
 
     // Calculate visible length (excluding ANSI codes)
@@ -493,6 +536,10 @@ void tui_print_header(void) {
     }
 
     printf("\n");
+
+    // Line 2: Build info
+    printf(ANSI_DIM "Build: %s %s | RP2040 Dual-Core @ 125MHz" ANSI_RESET "\n",
+           BUILD_DATE, BUILD_TIME);
 }
 
 void tui_print_status_banner(void) {

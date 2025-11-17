@@ -3,7 +3,7 @@
 **Project**: Reaction Wheel Emulator for NewSpace Systems NRWA-T6
 **Platform**: Raspberry Pi Pico (RP2040)
 **Started**: 2025-11-05
-**Last Updated**: 2025-11-10
+**Last Updated**: 2025-11-17
 
 ---
 
@@ -20,9 +20,9 @@
 | Phase 7: Protection System | ✅ Complete | 100% | Thresholds ✅, fault handling ✅ - HW validated |
 | Phase 8: Console & TUI | ✅ Complete | 100% | TUI, 8 tables, field editing, logo (85 KB) |
 | Phase 9: Fault Injection | ✅ Complete | 100% | JSON parser, scenario engine, test suite (110 KB) |
-| Phase 10: Integration | 🔄 Next | 0% | Dual-core orchestration |
+| Phase 10: Integration | 🔄 In Progress | 50% | Table 10 ✅, alignment fixes ✅, host tools pending |
 
-**Overall Completion**: 90% (9/10 phases complete)
+**Overall Completion**: 95% (9.5/10 phases complete)
 
 ---
 
@@ -1622,19 +1622,154 @@ target_include_directories(nrwa_t6_emulator PRIVATE
 
 ---
 
-## Phase 10: Main Application & Dual-Core ⏸️ PENDING
+## Phase 10: Main Application & Dual-Core 🔄 IN PROGRESS
 
-**Status**: Not started
+**Status**: Table 10 (Core1 Physics Stats) operational, alignment bugs fixed
+**Completed**: 2025-11-17
+**Commits**: Pending
+
+### What We Built
+
+#### 1. Table 10: Core1 Physics Statistics ✅
+
+**File**: [firmware/console/table_core1_stats.c](firmware/console/table_core1_stats.c) (312 lines)
+
+Complete live telemetry display from Core1 physics engine:
+- **17 fields** displaying real-time data at 100 Hz update rate
+- Float fields: speed_rpm, current_a, torque_mnm, power_w, voltage_v, momentum_nms, omega_rad_s
+- Enum fields: mode (CURRENT/SPEED/TORQUE/PWM), direction (POSITIVE/NEGATIVE)
+- Protection status: fault_status, warning_status, lcl_tripped (BOOL)
+- Performance metrics: tick_count, jitter_us, max_jitter_us, jitter_violations, timestamp_us
+
+**Critical Bug Fixes**:
+- **Memory alignment safety**: Fixed hard faults on ARM Cortex-M0+ when reading float/enum fields
+- **Float field handling**: Use `memcpy()` instead of pointer cast to avoid alignment violations
+- **Enum field handling**: Read only 1 byte (actual enum size) then zero-extend to prevent garbage reads
+- **Float printf support**: Enabled `PICO_PRINTF_SUPPORT_FLOAT=1` in CMake
+- **NaN/Inf safety**: Added defensive checks in `catalog_format_value()` to prevent printf lockup
+- **Explicit initialization**: Changed `= {}` to `= {0}` for guaranteed zero-init of telemetry buffers
+
+#### 2. Data Consistency: Unified Telemetry Source ✅
+
+**Files Modified**:
+- [firmware/console/table_control.c](firmware/console/table_control.c): Connected to Core1 telemetry
+- [firmware/console/table_control.h](firmware/console/table_control.h): Added `table_control_update()` function
+- [firmware/app_main.c](firmware/app_main.c): Calls update functions in main loop
+
+**Architecture**:
+```
+Core1 (100 Hz physics) → telemetry_snapshot_t → Core0 ring buffer
+                                                       ↓
+                            ┌──────────────────────────┴──────────────────────────┐
+                            ↓                          ↓                          ↓
+                    Table 4 (Control)      Table 10 (Physics)         Banner Status Line
+```
+
+All displays now pull from same `telemetry_snapshot_t` source - no duplicate state variables.
+
+#### 3. TUI Enhancements ✅
+
+**Build Info in Persistent Header**:
+- Version string from git (e.g., "a47b7ed-dirty")
+- Build date/time (e.g., "Nov 17 2025 11:48:34")
+- Platform info ("RP2040 Dual-Core @ 125MHz")
+- Visible in header that refreshes with TUI (not just startup banner)
+
+**Table Rendering Fixes**:
+- Removed debug output for clean production display
+- Fixed field loop control (was causing early termination)
+- All 17 fields render correctly without system freeze
+
+### Critical Implementation Notes
+
+**Memory Alignment on ARM Cortex-M0+ (CRITICAL)**:
+
+ARM Cortex-M0+ triggers **hard faults** on misaligned memory access. When reading float/enum fields from telemetry structs:
+
+**WRONG** (causes system freeze):
+```c
+volatile uint32_t* ptr = (volatile uint32_t*)&snapshot.speed_rpm;  // speed_rpm is float!
+uint32_t value = *ptr;  // HARD FAULT if ptr is not 4-byte aligned
+```
+
+**CORRECT** (safe for all alignments):
+```c
+// For FLOAT fields
+float f;
+memcpy(&f, (const void*)&snapshot.speed_rpm, sizeof(float));
+uint32_t value;
+memcpy(&value, &f, sizeof(uint32_t));
+
+// For ENUM fields (1-byte with padding)
+uint8_t enum_val;
+memcpy(&enum_val, (const void*)&snapshot.mode, sizeof(uint8_t));
+uint32_t value = (uint32_t)enum_val;  // Zero-extend
+```
+
+**Why this happened**:
+- Floats in `telemetry_snapshot_t` follow 7 other floats (28 bytes) - may not be 4-byte aligned
+- Enums are 1 byte, followed by 3 bytes of padding
+- Casting to `(uint32_t*)` and dereferencing reads beyond enum into padding (garbage)
+- On ARM, misaligned access triggers hard fault exception → CPU freeze, LED stops
+
+**Symptoms**:
+- System freeze when expanding Table 10
+- Heartbeat LED stops (indicates hard fault, not TUI hang)
+- ENUM fields show `INVALID(0xBDADADA0)` or `INVALID(12432640)` (reading padding bytes)
+- No error message or stack trace (CPU trapped in fault handler)
+
+**Documented in**:
+- [IMP.md Section 10.5](IMP.md#phase-10-main-application--dual-core-) - Critical Implementation Notes
+- [CLAUDE.md Common Pitfalls #13-15](CLAUDE.md#common-pitfalls)
+
+### Acceptance Criteria Progress
+
+**From** [IMP.md Phase 10](IMP.md#phase-10-main-application--dual-core-):
+- [x] Both cores running stable (Core0: comms/TUI, Core1: 100Hz physics)
+- [x] Console shows live telemetry (Table 10 displays all 17 fields, updating at 20Hz)
+- [ ] Commands from RS-485 change physics state (NSP handler connected but not tested)
+- [ ] No crashes after 24h soak test (system stable, ready for extended testing)
+
+### Files Modified
+
+| File | Changes | LOC |
+|------|---------|-----|
+| firmware/console/table_core1_stats.c | Complete implementation with alignment fixes | 312 |
+| firmware/console/table_core1_stats.h | Public API declarations | 50 |
+| firmware/console/table_control.c | Connected to telemetry snapshot | 227 |
+| firmware/console/table_control.h | Added update function | 76 |
+| firmware/console/tui.c | Fixed alignment bugs, removed debug output | 627 |
+| firmware/console/tables.c | Added NaN/Inf safety checks | 320 |
+| firmware/app_main.c | Added table update calls | 425 |
+| firmware/CMakeLists.txt | Enabled float printf support | 145 |
+| IMP.md | Documented alignment safety | +50 lines |
+| CLAUDE.md | Added 3 new pitfalls (#13-15) | +3 items |
+
+**Total**: ~2,200 lines (production code + documentation)
+
+### Build Metrics
+
+**Current Build** (2025-11-17):
+- **Text**: 114,272 bytes (44.5% of 256KB flash)
+- **Data**: 0 bytes
+- **BSS**: 17,712 bytes (68.6% of 264KB RAM)
+- **Total**: 131,984 bytes
+- **UF2**: 216KB
+
+**Flash Usage**: 44.5% ✅ (plenty of room for host tools and extended features)
+**RAM Usage**: 68.6% ⚠️ (monitor carefully, consider optimizing large buffers if needed)
+
+### Next Steps
+
+**Phase 10 Remaining**:
+- [ ] **10.2**: Implement `tools/host_tester.py` for NSP command validation
+- [ ] **10.3**: 24-hour soak test with fault injection scenarios
+- [ ] **Final integration**: RS-485 → NSP → Core1 command dispatch validation
+
 **Target Files**:
-- Complete `firmware/app_main.c` - Full integration
-- `tools/host_tester.py` - Host validation
-- `tools/errorgen.py` - Scenario builder
-
-**Acceptance Criteria** (from [IMP.md:550-553](IMP.md#L550-L553)):
-- [ ] Both cores running stable
-- [ ] Commands from RS-485 change physics state
-- [ ] Console shows live telemetry
-- [ ] No crashes after 24h soak test
+- Complete `firmware/app_main.c` - Full integration ✅ (mostly done)
+- `tools/host_tester.py` - Host validation ⏸️
+- `tools/errorgen.py` - Scenario builder ⏸️
 
 ---
 

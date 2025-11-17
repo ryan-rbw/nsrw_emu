@@ -341,6 +341,13 @@ screen /dev/ttyACM0 115200
 6. **Fixed-point formats**: UQ14.18 for speed (RPM), UQ18.14 for torque/current/power
 7. **GPIO init order**: Call `gpio_init_all()` before any GPIO operations
 8. **Timebase init**: Call `timebase_init()` before `timebase_start()`
+9. **Float printf MUST be enabled**: Add `PICO_PRINTF_SUPPORT_FLOAT=1` to CMakeLists.txt or printf("%.2f") causes lockup
+10. **Static struct initialization**: Use `= {0}` not just `{}` - C doesn't guarantee zero-init without explicit `{0}`
+11. **Watchdog timing**: Enable watchdog AFTER boot tests complete (tests can exceed timeout)
+12. **Qemu segfault on large binaries**: Comment out ARM execution line in build.make after cmake reconfigure (known SDK issue)
+13. **Memory alignment on ARM Cortex-M0+**: NEVER cast float/enum pointers to `(uint32_t*)` and dereference - causes hard fault. Use `memcpy()` for all non-uint32_t field reads from shared structs
+14. **ENUM size assumptions**: C enums may be 1-4 bytes. Read only actual size (1 byte for values 0-255) then zero-extend to uint32_t. Reading 4 bytes from 1-byte enum reads garbage padding
+15. **Alignment bug symptoms**: System freeze (LED stops), no error message, specific table fields trigger lockup, ENUM shows `INVALID(0xBDADADA0)`. Test table rendering on hardware - QEMU doesn't catch alignment faults
 
 ## Documentation Workflow (CRITICAL)
 
