@@ -52,6 +52,45 @@ static const fault_info_t fault_table[] = {
 };
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * @brief Convert fault bit to array index
+ *
+ * Efficiently converts a single fault bit (power of 2) to its corresponding
+ * index in the fault_table array. Uses bit manipulation instead of looping.
+ *
+ * @param fault_bit Single fault bit (e.g., FAULT_OVERSPEED = 0x00000002)
+ * @return Index 0-7, or -1 if invalid (zero, multiple bits, or out of range)
+ *
+ * Implementation:
+ * - Validates exactly one bit is set using (x & (x-1)) == 0 trick
+ * - Counts trailing zeros to find bit position (0-7)
+ * - More efficient than loop-based lookup
+ */
+static inline int fault_bit_to_index(uint32_t fault_bit) {
+    // Check for zero or multiple bits set
+    // For powers of 2: (x & (x-1)) == 0
+    // For zero: special case check
+    if (fault_bit == 0 || (fault_bit & (fault_bit - 1)) != 0) {
+        return -1;  // Invalid: zero or multiple bits
+    }
+
+    // Count trailing zeros (bit position)
+    // This is the index in fault_table
+    int idx = 0;
+    uint32_t mask = fault_bit;
+    while (!(mask & 1)) {
+        mask >>= 1;
+        idx++;
+    }
+
+    // Validate range (must be 0-7 for our 8 fault bits)
+    return (idx < 8) ? idx : -1;
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
@@ -282,13 +321,8 @@ const char* protection_get_param_units(uint8_t param_id) {
 }
 
 const char* protection_get_fault_name(uint32_t fault_bit) {
-    // Find the bit position (0-7)
-    for (int i = 0; i < 8; i++) {
-        if (fault_bit == (1U << i)) {
-            return fault_table[i].name;
-        }
-    }
-    return "UNKNOWN";
+    int idx = fault_bit_to_index(fault_bit);
+    return (idx >= 0) ? fault_table[idx].name : "UNKNOWN";
 }
 
 int protection_format_fault_string(uint32_t fault_mask, char* buf, size_t buf_size) {
@@ -331,19 +365,11 @@ int protection_format_fault_string(uint32_t fault_mask, char* buf, size_t buf_si
 }
 
 bool protection_is_latching_fault(uint32_t fault_bit) {
-    for (int i = 0; i < 8; i++) {
-        if (fault_bit == (1U << i)) {
-            return fault_table[i].latching;
-        }
-    }
-    return false;
+    int idx = fault_bit_to_index(fault_bit);
+    return (idx >= 0) && fault_table[idx].latching;
 }
 
 bool protection_trips_lcl(uint32_t fault_bit) {
-    for (int i = 0; i < 8; i++) {
-        if (fault_bit == (1U << i)) {
-            return fault_table[i].trips_lcl;
-        }
-    }
-    return false;
+    int idx = fault_bit_to_index(fault_bit);
+    return (idx >= 0) && fault_table[idx].trips_lcl;
 }
