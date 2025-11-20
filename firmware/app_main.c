@@ -36,6 +36,7 @@
 #include "table_fault_injection.h"
 #include "table_core1_stats.h"
 #include "table_test_modes.h"
+#include "table_serial.h"
 #include "table_nsp.h"
 
 // Test modes (operating scenarios)
@@ -386,6 +387,9 @@ int main(void) {
 
         // Poll RS-485 for incoming NSP packets (non-blocking)
         nsp_handler_poll();
+
+        // Update serial layer stats (Table 2)
+        table_serial_update();
 
         // Update NSP stats table (Table 3)
         table_nsp_update();

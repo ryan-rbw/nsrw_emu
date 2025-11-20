@@ -76,4 +76,15 @@ void nsp_handler_get_detailed_stats(uint32_t* rx_bytes, uint32_t* rx_packets,
  */
 void nsp_handler_set_debug(bool enable);
 
+/**
+ * @brief Get serial layer statistics (RS-485 and SLIP)
+ *
+ * @param rx_bytes Total bytes received on RS-485
+ * @param tx_bytes Total bytes transmitted on RS-485
+ * @param slip_frames_ok Successfully decoded SLIP frames
+ * @param slip_errors SLIP framing errors
+ */
+void nsp_handler_get_serial_stats(uint32_t* rx_bytes, uint32_t* tx_bytes,
+                                   uint32_t* slip_frames_ok, uint32_t* slip_errors);
+
 #endif // NSP_HANDLER_H

@@ -7,20 +7,19 @@
 
 #include "table_serial.h"
 #include "tables.h"
+#include "../nsp_handler.h"
 #include <stdio.h>
 
 // ============================================================================
-// Live Data (Stubs - will be connected to actual drivers in future)
+// Live Data (Connected to NSP Handler)
 // ============================================================================
 
 static volatile uint32_t serial_status = 1;           // 1 = active, 0 = inactive
 static volatile uint32_t serial_tx_count = 0;         // Total TX bytes
 static volatile uint32_t serial_rx_count = 0;         // Total RX bytes
-static volatile uint32_t serial_tx_errors = 0;        // TX error count
-static volatile uint32_t serial_rx_errors = 0;        // RX error count
-static volatile uint32_t serial_baud_kbps = 4608;     // 460.8 kbps (× 10)
 static volatile uint32_t serial_slip_frames_ok = 0;   // Valid SLIP frames decoded
-static volatile uint32_t serial_crc_errors = 0;       // CRC mismatches
+static volatile uint32_t serial_slip_errors = 0;      // SLIP framing errors
+static volatile uint32_t serial_baud_kbps = 4608;     // 460.8 kbps (× 10)
 
 // ============================================================================
 // Field Definitions
@@ -65,24 +64,24 @@ static const field_meta_t serial_fields[] = {
     },
     {
         .id = 204,
-        .name = "tx_errors",
+        .name = "slip_frames_ok",
         .type = FIELD_TYPE_U32,
-        .units = "errors",
+        .units = "frames",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&serial_tx_errors,
+        .ptr = (volatile uint32_t*)&serial_slip_frames_ok,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 205,
-        .name = "rx_errors",
+        .name = "slip_errors",
         .type = FIELD_TYPE_U32,
-        .units = "errors",
+        .units = "errs",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&serial_rx_errors,
+        .ptr = (volatile uint32_t*)&serial_slip_errors,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
@@ -95,30 +94,6 @@ static const field_meta_t serial_fields[] = {
         .access = FIELD_ACCESS_RO,
         .default_val = 4608,
         .ptr = (volatile uint32_t*)&serial_baud_kbps,
-        .dirty = false,
-        .enum_values = NULL,
-        .enum_count = 0,
-    },
-    {
-        .id = 207,
-        .name = "slip_frames_ok",
-        .type = FIELD_TYPE_U32,
-        .units = "frames",
-        .access = FIELD_ACCESS_RO,
-        .default_val = 0,
-        .ptr = (volatile uint32_t*)&serial_slip_frames_ok,
-        .dirty = false,
-        .enum_values = NULL,
-        .enum_count = 0,
-    },
-    {
-        .id = 208,
-        .name = "crc_errors",
-        .type = FIELD_TYPE_U32,
-        .units = "errors",
-        .access = FIELD_ACCESS_RO,
-        .default_val = 0,
-        .ptr = (volatile uint32_t*)&serial_crc_errors,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
@@ -144,4 +119,24 @@ static const table_meta_t serial_table = {
 void table_serial_init(void) {
     // Register table with catalog
     catalog_register_table(&serial_table);
+}
+
+// ============================================================================
+// Update Function
+// ============================================================================
+
+void table_serial_update(void) {
+    // Fetch latest stats from NSP handler (serial layer)
+    uint32_t rx_b, tx_b, slip_ok, slip_err;
+
+    nsp_handler_get_serial_stats(&rx_b, &tx_b, &slip_ok, &slip_err);
+
+    // Update table fields
+    serial_rx_count = rx_b;
+    serial_tx_count = tx_b;
+    serial_slip_frames_ok = slip_ok;
+    serial_slip_errors = slip_err;
+
+    // Status is active if we've received any bytes
+    serial_status = (rx_b > 0 || tx_b > 0) ? 1 : 0;
 }

@@ -24,6 +24,8 @@ static uint32_t rx_packet_count = 0;
 static uint32_t tx_packet_count = 0;
 static uint32_t error_count = 0;
 static uint32_t rx_byte_count = 0;
+static uint32_t tx_byte_count = 0;
+static uint32_t slip_frames_ok_count = 0;
 static uint32_t slip_error_count = 0;
 static uint32_t nsp_parse_error_count = 0;
 static uint32_t wrong_addr_count = 0;
@@ -58,6 +60,8 @@ void nsp_handler_init(uint8_t device_address) {
     tx_packet_count = 0;
     error_count = 0;
     rx_byte_count = 0;
+    tx_byte_count = 0;
+    slip_frames_ok_count = 0;
     slip_error_count = 0;
     nsp_parse_error_count = 0;
     wrong_addr_count = 0;
@@ -99,6 +103,9 @@ void nsp_handler_poll(void) {
                 slip_decoder_reset(&slip_decoder);
                 continue;
             }
+
+            // Valid SLIP frame decoded
+            slip_frames_ok_count++;
 
             if (debug_rx) {
                 printf("[NSP] SLIP frame complete (%zu bytes)\n", decoded_len);
@@ -197,6 +204,7 @@ void nsp_handler_poll(void) {
                 // Send SLIP-encoded reply over RS-485
                 if (rs485_send(slip_reply, slip_reply_len)) {
                     tx_packet_count++;
+                    tx_byte_count += slip_reply_len;  // Track TX bytes
                     if (debug_rx) {
                         printf("[NSP] Reply sent (%zu bytes)\n", slip_reply_len);
                     }
@@ -240,4 +248,12 @@ void nsp_handler_get_detailed_stats(uint32_t* rx_bytes, uint32_t* rx_packets,
 
 void nsp_handler_set_debug(bool enable) {
     debug_rx = enable;
+}
+
+void nsp_handler_get_serial_stats(uint32_t* rx_bytes, uint32_t* tx_bytes,
+                                   uint32_t* slip_frames_ok, uint32_t* slip_errors) {
+    if (rx_bytes) *rx_bytes = rx_byte_count;
+    if (tx_bytes) *tx_bytes = tx_byte_count;
+    if (slip_frames_ok) *slip_frames_ok = slip_frames_ok_count;
+    if (slip_errors) *slip_errors = slip_error_count;
 }
