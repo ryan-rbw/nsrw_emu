@@ -7,18 +7,21 @@
 
 #include "table_nsp.h"
 #include "tables.h"
+#include "../nsp_handler.h"
 #include <stdio.h>
 
 // ============================================================================
-// Live Data (Stubs - will be connected to actual NSP driver in future)
+// Live Data (Connected to NSP Handler)
 // ============================================================================
 
-static volatile uint32_t nsp_last_cmd = 0x00;         // Last command received
-static volatile uint32_t nsp_poll_seen = 0;           // Poll bit seen (bool)
-static volatile uint32_t nsp_ack_bit = 0;             // ACK bit status (bool)
-static volatile uint32_t nsp_cmd_count = 0;           // Total commands processed
-static volatile uint32_t nsp_reply_count = 0;         // Total replies sent
-static volatile uint32_t nsp_last_timing_ms = 0;      // Last cmd processing time (ms)
+static volatile uint32_t nsp_rx_bytes = 0;            // Total bytes received
+static volatile uint32_t nsp_rx_packets = 0;          // Valid packets received
+static volatile uint32_t nsp_tx_packets = 0;          // Packets transmitted
+static volatile uint32_t nsp_slip_errors = 0;         // SLIP framing errors
+static volatile uint32_t nsp_parse_errors = 0;        // NSP parse errors
+static volatile uint32_t nsp_wrong_addr = 0;          // Wrong address packets
+static volatile uint32_t nsp_cmd_errors = 0;          // Command dispatch errors
+static volatile uint32_t nsp_total_errors = 0;        // Total errors
 
 // ============================================================================
 // Field Definitions
@@ -27,72 +30,96 @@ static volatile uint32_t nsp_last_timing_ms = 0;      // Last cmd processing tim
 static const field_meta_t nsp_fields[] = {
     {
         .id = 301,
-        .name = "last_cmd",
-        .type = FIELD_TYPE_HEX,
-        .units = "",
+        .name = "rx_bytes",
+        .type = FIELD_TYPE_U32,
+        .units = "bytes",
         .access = FIELD_ACCESS_RO,
-        .default_val = 0x00,
-        .ptr = (volatile uint32_t*)&nsp_last_cmd,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&nsp_rx_bytes,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 302,
-        .name = "poll_seen",
-        .type = FIELD_TYPE_BOOL,
-        .units = "",
+        .name = "rx_packets",
+        .type = FIELD_TYPE_U32,
+        .units = "pkts",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&nsp_poll_seen,
+        .ptr = (volatile uint32_t*)&nsp_rx_packets,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 303,
-        .name = "ack_bit",
-        .type = FIELD_TYPE_BOOL,
-        .units = "",
+        .name = "tx_packets",
+        .type = FIELD_TYPE_U32,
+        .units = "pkts",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&nsp_ack_bit,
+        .ptr = (volatile uint32_t*)&nsp_tx_packets,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 304,
-        .name = "cmd_count",
+        .name = "slip_errors",
         .type = FIELD_TYPE_U32,
-        .units = "cmds",
+        .units = "errs",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&nsp_cmd_count,
+        .ptr = (volatile uint32_t*)&nsp_slip_errors,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 305,
-        .name = "reply_count",
+        .name = "parse_errors",
         .type = FIELD_TYPE_U32,
-        .units = "replies",
+        .units = "errs",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&nsp_reply_count,
+        .ptr = (volatile uint32_t*)&nsp_parse_errors,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
     },
     {
         .id = 306,
-        .name = "last_timing_ms",
+        .name = "wrong_addr",
         .type = FIELD_TYPE_U32,
-        .units = "ms",
+        .units = "pkts",
         .access = FIELD_ACCESS_RO,
         .default_val = 0,
-        .ptr = (volatile uint32_t*)&nsp_last_timing_ms,
+        .ptr = (volatile uint32_t*)&nsp_wrong_addr,
+        .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
+    },
+    {
+        .id = 307,
+        .name = "cmd_errors",
+        .type = FIELD_TYPE_U32,
+        .units = "errs",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&nsp_cmd_errors,
+        .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
+    },
+    {
+        .id = 308,
+        .name = "total_errors",
+        .type = FIELD_TYPE_U32,
+        .units = "errs",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&nsp_total_errors,
         .dirty = false,
         .enum_values = NULL,
         .enum_count = 0,
@@ -105,8 +132,8 @@ static const field_meta_t nsp_fields[] = {
 
 static const table_meta_t nsp_table = {
     .id = 3,
-    .name = "NSP Status",
-    .description = "Last cmd/reply, poll, ack, stats",
+    .name = "NSP Stats",
+    .description = "RX/TX packets, errors breakdown",
     .fields = nsp_fields,
     .field_count = sizeof(nsp_fields) / sizeof(nsp_fields[0]),
 };
@@ -118,4 +145,26 @@ static const table_meta_t nsp_table = {
 void table_nsp_init(void) {
     // Register table with catalog
     catalog_register_table(&nsp_table);
+}
+
+// ============================================================================
+// Update Function
+// ============================================================================
+
+void table_nsp_update(void) {
+    // Fetch latest stats from NSP handler
+    uint32_t rx_b, rx_p, tx_p, slip_e, nsp_e, wrong_a, cmd_e, total_e;
+
+    nsp_handler_get_detailed_stats(&rx_b, &rx_p, &tx_p, &slip_e,
+                                    &nsp_e, &wrong_a, &cmd_e, &total_e);
+
+    // Update table fields
+    nsp_rx_bytes = rx_b;
+    nsp_rx_packets = rx_p;
+    nsp_tx_packets = tx_p;
+    nsp_slip_errors = slip_e;
+    nsp_parse_errors = nsp_e;
+    nsp_wrong_addr = wrong_a;
+    nsp_cmd_errors = cmd_e;
+    nsp_total_errors = total_e;
 }

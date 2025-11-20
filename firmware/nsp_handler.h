@@ -49,4 +49,31 @@ void nsp_handler_poll(void);
  */
 void nsp_handler_get_stats(uint32_t* rx_count, uint32_t* tx_count, uint32_t* error_count);
 
+/**
+ * @brief Get detailed statistics for debugging
+ *
+ * @param rx_bytes Total bytes received
+ * @param rx_packets Valid packets received
+ * @param tx_packets Packets transmitted
+ * @param slip_errors SLIP framing errors
+ * @param nsp_errors NSP parse errors (CRC, length, etc.)
+ * @param wrong_addr Packets with wrong destination address
+ * @param cmd_errors Command dispatch errors
+ * @param total_errors Total error count
+ */
+void nsp_handler_get_detailed_stats(uint32_t* rx_bytes, uint32_t* rx_packets,
+                                     uint32_t* tx_packets, uint32_t* slip_errors,
+                                     uint32_t* nsp_errors, uint32_t* wrong_addr,
+                                     uint32_t* cmd_errors, uint32_t* total_errors);
+
+/**
+ * @brief Enable or disable debug RX logging
+ *
+ * When enabled, prints detailed information about received bytes and packet processing.
+ * Default: enabled
+ *
+ * @param enable true to enable debug logging, false to disable
+ */
+void nsp_handler_set_debug(bool enable);
+
 #endif // NSP_HANDLER_H

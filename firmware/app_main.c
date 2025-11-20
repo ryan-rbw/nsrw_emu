@@ -36,6 +36,7 @@
 #include "table_fault_injection.h"
 #include "table_core1_stats.h"
 #include "table_test_modes.h"
+#include "table_nsp.h"
 
 // Test modes (operating scenarios)
 #include "nss_nrwa_t6_test_modes.h"
@@ -385,6 +386,9 @@ int main(void) {
 
         // Poll RS-485 for incoming NSP packets (non-blocking)
         nsp_handler_poll();
+
+        // Update NSP stats table (Table 3)
+        table_nsp_update();
 
         // Small delay to avoid busy-waiting
         sleep_ms(50);  // 20 Hz update rate
