@@ -111,10 +111,11 @@ nsp_result_t nsp_parse(const uint8_t *raw_data, size_t raw_len, nsp_packet_t *pa
 /**
  * @brief Build NSP reply packet
  *
- * Creates a reply packet with the same B/A bits as the request, and
- * optionally adds data payload. CRC is automatically computed and appended.
+ * Creates a reply packet with appropriate ACK/NACK bit set, preserves B bit
+ * from request, and optionally adds data payload. CRC is automatically computed and appended.
  *
  * @param request Pointer to original request packet
+ * @param ack true for ACK (A=1), false for NACK (A=0)
  * @param data Pointer to reply data (can be NULL if data_len = 0)
  * @param data_len Length of reply data
  * @param output Pointer to output buffer
@@ -122,6 +123,7 @@ nsp_result_t nsp_parse(const uint8_t *raw_data, size_t raw_len, nsp_packet_t *pa
  * @return true on success, false on error
  */
 bool nsp_build_reply(const nsp_packet_t *request,
+                     bool ack,
                      const uint8_t *data, size_t data_len,
                      uint8_t *output, size_t *output_len);
 

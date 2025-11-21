@@ -81,6 +81,7 @@ nsp_result_t nsp_parse(const uint8_t *raw_data, size_t raw_len, nsp_packet_t *pa
 // ============================================================================
 
 bool nsp_build_reply(const nsp_packet_t *request,
+                     bool ack,
                      const uint8_t *data, size_t data_len,
                      uint8_t *output, size_t *output_len) {
     // Validate inputs
@@ -107,10 +108,10 @@ bool nsp_build_reply(const nsp_packet_t *request,
     // Source = our address
     output[idx++] = g_device_address;
 
-    // Control byte: preserve B/A bits from request, keep same command
+    // Control byte: Set A bit based on ACK/NACK, preserve B bit, keep same command
     // Poll bit is typically cleared in replies (0 = no reply expected to a reply)
     uint8_t ctrl_b = (request->ctrl & NSP_CTRL_B_BIT);
-    uint8_t ctrl_a = (request->ctrl & NSP_CTRL_A_BIT);
+    uint8_t ctrl_a = ack ? NSP_CTRL_A_BIT : 0;  // A=1 for ACK, A=0 for NACK
     uint8_t cmd = nsp_get_command(request->ctrl);
     output[idx++] = ctrl_b | ctrl_a | cmd;  // Poll=0 for replies
 
@@ -133,6 +134,6 @@ bool nsp_build_reply(const nsp_packet_t *request,
 }
 
 bool nsp_build_ack(const nsp_packet_t *request, uint8_t *output, size_t *output_len) {
-    // ACK is a reply with no data payload
-    return nsp_build_reply(request, NULL, 0, output, output_len);
+    // ACK is a reply with no data payload, A bit set to 1
+    return nsp_build_reply(request, true, NULL, 0, output, output_len);
 }

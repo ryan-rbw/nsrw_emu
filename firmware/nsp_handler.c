@@ -211,8 +211,9 @@ void nsp_handler_poll(void) {
                     printf("[NSP] Poll bit set, building reply...\n");
                 }
 
-                // Build NSP reply packet
-                if (!nsp_build_reply(&packet, result.data, result.data_len,
+                // Build NSP reply packet (pass ACK/NACK status from command result)
+                bool ack = (result.status == CMD_ACK);
+                if (!nsp_build_reply(&packet, ack, result.data, result.data_len,
                                      nsp_reply, &nsp_reply_len)) {
                     error_count++;
                     if (debug_rx) {
