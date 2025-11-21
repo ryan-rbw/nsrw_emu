@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 // ============================================================================
 // API Functions
@@ -73,6 +74,15 @@ void nsp_handler_get_detailed_stats(uint32_t* rx_bytes, uint32_t* rx_packets,
  * @param last_cmd_err Last unrecognized command code
  */
 void nsp_handler_get_error_details(uint32_t* last_parse_err, uint32_t* last_cmd_err);
+
+/**
+ * @brief Get last received frame bytes for debugging
+ *
+ * @param frame_buf Buffer to copy frame bytes into (can be NULL)
+ * @param buf_size Size of frame_buf
+ * @param frame_len Pointer to receive actual frame length
+ */
+void nsp_handler_get_last_frame(uint8_t* frame_buf, size_t buf_size, uint32_t* frame_len);
 
 /**
  * @brief Enable or disable debug RX logging

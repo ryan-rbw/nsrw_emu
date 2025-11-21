@@ -26,6 +26,7 @@ static volatile uint32_t nsp_total_errors = 0;        // Total errors
 // Last error details
 static volatile uint32_t nsp_last_parse_error = 0;    // Last parse error code
 static volatile uint32_t nsp_last_cmd_error = 0;      // Last command error code
+static volatile uint32_t nsp_last_frame_len = 0;      // Last frame length in bytes
 
 // Enum string lookup for parse error codes (index = error code)
 static const char* parse_error_strings[] = {
@@ -161,6 +162,18 @@ static const field_meta_t nsp_fields[] = {
         .enum_values = NULL,
         .enum_count = 0,
     },
+    {
+        .id = 311,
+        .name = "last_frame_len",
+        .type = FIELD_TYPE_U32,
+        .units = "bytes",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&nsp_last_frame_len,
+        .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
+    },
 };
 
 // ============================================================================
@@ -206,8 +219,11 @@ void table_nsp_update(void) {
     nsp_total_errors = total_e;
 
     // Fetch error details
-    uint32_t last_parse, last_cmd;
+    uint32_t last_parse, last_cmd, frame_len;
     nsp_handler_get_error_details(&last_parse, &last_cmd);
+    nsp_handler_get_last_frame(NULL, 0, &frame_len);  // Just get length
+
     nsp_last_parse_error = last_parse;
     nsp_last_cmd_error = last_cmd;
+    nsp_last_frame_len = frame_len;
 }

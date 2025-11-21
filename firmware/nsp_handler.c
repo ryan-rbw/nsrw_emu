@@ -34,6 +34,8 @@ static uint32_t cmd_dispatch_error_count = 0;
 // Last error details (for debugging)
 static uint32_t last_parse_error_code = 0;     // Last NSP parse error code (0=none, 1-4=error)
 static uint32_t last_cmd_error_code = 0;       // Last unrecognized command code
+static uint8_t last_frame_bytes[32] = {0};     // Last received frame (first 32 bytes)
+static uint32_t last_frame_len = 0;            // Length of last frame
 
 // Debug flag (set to false to disable verbose logging after initial testing)
 static bool debug_rx = true;
@@ -72,6 +74,8 @@ void nsp_handler_init(uint8_t device_address) {
     cmd_dispatch_error_count = 0;
     last_parse_error_code = 0;
     last_cmd_error_code = 0;
+    last_frame_len = 0;
+    memset(last_frame_bytes, 0, sizeof(last_frame_bytes));
 }
 
 // ============================================================================
@@ -113,8 +117,23 @@ void nsp_handler_poll(void) {
             // Valid SLIP frame decoded
             slip_frames_ok_count++;
 
+            // Save last frame for debugging (first 32 bytes)
+            last_frame_len = decoded_len;
+            size_t copy_len = decoded_len < sizeof(last_frame_bytes) ? decoded_len : sizeof(last_frame_bytes);
+            memcpy(last_frame_bytes, slip_output_buf, copy_len);
+
             if (debug_rx) {
                 printf("[NSP] SLIP frame complete (%zu bytes)\n", decoded_len);
+
+                // Hex dump of received frame
+                printf("[NSP] Frame hex dump: ");
+                for (size_t i = 0; i < decoded_len; i++) {
+                    printf("%02X ", slip_output_buf[i]);
+                    if ((i + 1) % 16 == 0 && i + 1 < decoded_len) {
+                        printf("\n[NSP]                  ");
+                    }
+                }
+                printf("\n");
             }
 
             // Parse NSP packet
@@ -127,7 +146,14 @@ void nsp_handler_poll(void) {
                 error_count++;
                 last_parse_error_code = (uint32_t)parse_result;  // Save error code for debugging
                 if (debug_rx) {
-                    printf("[NSP] Parse error: %d (CRC/length/format)\n", parse_result);
+                    printf("[NSP] Parse error: %d ", parse_result);
+                    switch (parse_result) {
+                        case 1: printf("(TOO_SHORT: frame < 6 bytes, got %zu)\n", decoded_len); break;
+                        case 2: printf("(BAD_LENGTH: len field mismatch)\n"); break;
+                        case 3: printf("(BAD_CRC: CRC validation failed)\n"); break;
+                        case 4: printf("(NULL_PTR: null pointer)\n"); break;
+                        default: printf("(UNKNOWN)\n"); break;
+                    }
                 }
                 slip_decoder_reset(&slip_decoder);
                 continue;
@@ -257,6 +283,14 @@ void nsp_handler_get_detailed_stats(uint32_t* rx_bytes, uint32_t* rx_packets,
 void nsp_handler_get_error_details(uint32_t* last_parse_err, uint32_t* last_cmd_err) {
     if (last_parse_err) *last_parse_err = last_parse_error_code;
     if (last_cmd_err) *last_cmd_err = last_cmd_error_code;
+}
+
+void nsp_handler_get_last_frame(uint8_t* frame_buf, size_t buf_size, uint32_t* frame_len) {
+    if (frame_len) *frame_len = last_frame_len;
+    if (frame_buf && buf_size > 0) {
+        size_t copy_len = last_frame_len < buf_size ? last_frame_len : buf_size;
+        memcpy(frame_buf, last_frame_bytes, copy_len);
+    }
 }
 
 void nsp_handler_set_debug(bool enable) {
