@@ -2,8 +2,11 @@
  * @file nsp.h
  * @brief NSP (NewSpace Protocol) Implementation
  *
- * NSP packet structure (SLIP-decoded):
- * [Dest | Src | Ctrl | Len | Data... | CRC_L | CRC_H]
+ * NSP packet structure per ICD Table 11-1 (after SLIP decoding):
+ * [Dest | Src | Ctrl | Data... | CRC_L | CRC_H]
+ *
+ * Note: There is NO Length field. Packet boundaries are determined by SLIP framing.
+ * Data length is calculated as: packet_size - 3 (header) - 2 (CRC)
  *
  * Message Control byte (Ctrl):
  * [Poll:1 | B:1 | A:1 | Command:5]
@@ -11,7 +14,7 @@
  * - B, A: ACK bits (preserved in reply)
  * - Command: 5-bit command code (0x00-0x1F)
  *
- * CRC: CCITT CRC-16 (init 0xFFFF, LSB-first) covers [Dest ... Data]
+ * CRC: CCITT CRC-16 (init 0xFFFF, LSB-first) covers [Dest | Src | Ctrl | Data...]
  * Transmitted as [CRC_L, CRC_H] (little-endian)
  */
 
@@ -26,14 +29,14 @@
 // NSP Protocol Constants
 // ============================================================================
 
-/** @brief Minimum NSP packet size: Dest + Src + Ctrl + Len + CRC (2 bytes) */
-#define NSP_MIN_PACKET_SIZE 6
+/** @brief Minimum NSP packet size: Dest + Src + Ctrl + CRC (2 bytes) */
+#define NSP_MIN_PACKET_SIZE 5
 
 /** @brief Maximum NSP data payload size */
 #define NSP_MAX_DATA_SIZE 255
 
 /** @brief Maximum NSP packet size (including CRC) */
-#define NSP_MAX_PACKET_SIZE (4 + NSP_MAX_DATA_SIZE + 2)  // Header + Data + CRC
+#define NSP_MAX_PACKET_SIZE (3 + NSP_MAX_DATA_SIZE + 2)  // Header (Dest+Src+Ctrl) + Data + CRC
 
 // ============================================================================
 // NSP Command Codes

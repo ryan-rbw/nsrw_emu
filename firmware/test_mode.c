@@ -532,24 +532,24 @@ void test_nsp_ping(void) {
     uint8_t ping_raw[NSP_MAX_PACKET_SIZE];
     size_t ping_raw_len = 0;
 
-    // Manually build packet for testing
+    // Manually build packet for testing (NO Length field per ICD Table 11-1)
     ping_raw[0] = ping_request.dest;
     ping_raw[1] = ping_request.src;
     ping_raw[2] = ping_request.ctrl;
-    ping_raw[3] = ping_request.len;
+    // No Length field - data follows directly (none for PING)
 
-    // Compute and append CRC
-    uint16_t crc = crc_ccitt_calculate(ping_raw, 4);
-    ping_raw[4] = (uint8_t)(crc & 0xFF);
-    ping_raw[5] = (uint8_t)((crc >> 8) & 0xFF);
-    ping_raw_len = 6;
+    // Compute and append CRC over header only (no data)
+    uint16_t crc = crc_ccitt_calculate(ping_raw, 3);
+    ping_raw[3] = (uint8_t)(crc & 0xFF);
+    ping_raw[4] = (uint8_t)((crc >> 8) & 0xFF);
+    ping_raw_len = 5;
 
     printf("  PING packet (hex): ");
     for (size_t i = 0; i < ping_raw_len; i++) {
         printf("%02X ", ping_raw[i]);
     }
     printf("\n");
-    printf("  Dest=%d, Src=%d, Ctrl=0x%02X, Len=%d, CRC=0x%04X\n",
+    printf("  Dest=%d, Src=%d, Ctrl=0x%02X, DataLen=%d, CRC=0x%04X\n",
            ping_request.dest, ping_request.src, ping_request.ctrl,
            ping_request.len, crc);
     TEST_RESULT("Test 1 (build PING)", true);

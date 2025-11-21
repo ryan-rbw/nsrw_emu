@@ -31,7 +31,7 @@ nsp_result_t nsp_parse(const uint8_t *raw_data, size_t raw_len, nsp_packet_t *pa
         return NSP_ERR_NULL_PTR;
     }
 
-    // Check minimum packet size: Dest + Src + Ctrl + Len + CRC (2 bytes) = 6 bytes
+    // Check minimum packet size: Dest + Src + Ctrl + CRC (2 bytes) = 5 bytes
     if (raw_len < NSP_MIN_PACKET_SIZE) {
         return NSP_ERR_TOO_SHORT;
     }
@@ -40,28 +40,33 @@ nsp_result_t nsp_parse(const uint8_t *raw_data, size_t raw_len, nsp_packet_t *pa
     packet->dest = raw_data[0];
     packet->src  = raw_data[1];
     packet->ctrl = raw_data[2];
-    packet->len  = raw_data[3];
 
-    // Validate length field
-    // Expected packet size: 4 (header) + len (data) + 2 (CRC)
-    size_t expected_size = 4 + packet->len + 2;
-    if (raw_len != expected_size) {
+    // Calculate data length from packet size
+    // Packet layout: [Dest | Src | Ctrl | Data... | CRC_L | CRC_H]
+    // Data length = total_len - 3 (header) - 2 (CRC)
+    size_t data_len = raw_len - 5;
+
+    // Validate data length fits in packet
+    if (data_len > NSP_MAX_DATA_SIZE) {
         return NSP_ERR_BAD_LENGTH;
     }
 
-    // Extract data payload
+    packet->len = (uint8_t)data_len;
+
+    // Extract data payload (if any)
     if (packet->len > 0) {
-        memcpy(packet->data, &raw_data[4], packet->len);
+        memcpy(packet->data, &raw_data[3], packet->len);
     }
 
-    // Extract received CRC (LSB-first: CRC_L at [4+len], CRC_H at [4+len+1])
-    size_t crc_offset = 4 + packet->len;
+    // Extract received CRC (LSB-first: CRC_L at [3+len], CRC_H at [3+len+1])
+    size_t crc_offset = 3 + packet->len;
     uint16_t received_crc = (uint16_t)raw_data[crc_offset] |
                            ((uint16_t)raw_data[crc_offset + 1] << 8);
     packet->crc = received_crc;
 
-    // Compute CRC over: Dest + Src + Ctrl + Len + Data
-    uint16_t computed_crc = crc_ccitt_calculate(raw_data, 4 + packet->len);
+    // Compute CRC over: Dest + Src + Ctrl + Data
+    // (Length field is NOT part of NSP protocol per ICD Table 11-1)
+    uint16_t computed_crc = crc_ccitt_calculate(raw_data, 3 + packet->len);
 
     // Verify CRC
     if (computed_crc != received_crc) {
@@ -109,16 +114,14 @@ bool nsp_build_reply(const nsp_packet_t *request,
     uint8_t cmd = nsp_get_command(request->ctrl);
     output[idx++] = ctrl_b | ctrl_a | cmd;  // Poll=0 for replies
 
-    // Length
-    output[idx++] = (uint8_t)data_len;
-
-    // Data payload
+    // Data payload (NO Length field per ICD Table 11-1)
     if (data_len > 0) {
         memcpy(&output[idx], data, data_len);
         idx += data_len;
     }
 
-    // Compute CRC over: Dest + Src + Ctrl + Len + Data
+    // Compute CRC over: Dest + Src + Ctrl + Data
+    // (Length field is NOT part of NSP protocol per ICD Table 11-1)
     uint16_t crc = crc_ccitt_calculate(output, idx);
 
     // Append CRC (LSB-first)
