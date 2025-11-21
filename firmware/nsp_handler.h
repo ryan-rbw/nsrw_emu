@@ -85,6 +85,15 @@ void nsp_handler_get_error_details(uint32_t* last_parse_err, uint32_t* last_cmd_
 void nsp_handler_get_last_frame(uint8_t* frame_buf, size_t buf_size, uint32_t* frame_len);
 
 /**
+ * @brief Get last successfully received command bytes
+ *
+ * @param cmd_buf Buffer to copy command bytes into (can be NULL)
+ * @param buf_size Size of cmd_buf
+ * @param cmd_len Pointer to receive actual command length
+ */
+void nsp_handler_get_last_rx_cmd(uint8_t* cmd_buf, size_t buf_size, uint32_t* cmd_len);
+
+/**
  * @brief Enable or disable debug RX logging
  *
  * When enabled, prints detailed information about received bytes and packet processing.

@@ -36,6 +36,8 @@ static uint32_t last_parse_error_code = 0;     // Last NSP parse error code (0=n
 static uint32_t last_cmd_error_code = 0;       // Last unrecognized command code
 static uint8_t last_frame_bytes[32] = {0};     // Last received frame (first 32 bytes)
 static uint32_t last_frame_len = 0;            // Length of last frame
+static uint8_t last_rx_cmd_bytes[16] = {0};    // Last successfully parsed command (NSP packet)
+static uint32_t last_rx_cmd_len = 0;           // Length of last RX command
 
 // Debug flag (set to false to disable verbose logging after initial testing)
 static bool debug_rx = true;
@@ -75,7 +77,9 @@ void nsp_handler_init(uint8_t device_address) {
     last_parse_error_code = 0;
     last_cmd_error_code = 0;
     last_frame_len = 0;
+    last_rx_cmd_len = 0;
     memset(last_frame_bytes, 0, sizeof(last_frame_bytes));
+    memset(last_rx_cmd_bytes, 0, sizeof(last_rx_cmd_bytes));
 }
 
 // ============================================================================
@@ -163,6 +167,15 @@ void nsp_handler_poll(void) {
                 printf("[NSP] Packet parsed: dest=0x%02X src=0x%02X ctrl=0x%02X len=%zu\n",
                        packet.dest, packet.src, packet.ctrl, packet.len);
             }
+
+            // Save last successfully parsed command (raw NSP packet, up to 16 bytes)
+            last_rx_cmd_len = decoded_len < sizeof(last_rx_cmd_bytes) ? decoded_len : sizeof(last_rx_cmd_bytes);
+            memcpy(last_rx_cmd_bytes, slip_output_buf, last_rx_cmd_len);
+
+            // Reset error fields on successful parse (don't show stale errors)
+            last_parse_error_code = 0;
+            last_cmd_error_code = 0;
+            last_frame_len = 0;
 
             // Check if packet is addressed to us
             if (packet.dest != device_addr && packet.dest != 0xFF) {
@@ -291,6 +304,14 @@ void nsp_handler_get_last_frame(uint8_t* frame_buf, size_t buf_size, uint32_t* f
     if (frame_buf && buf_size > 0) {
         size_t copy_len = last_frame_len < buf_size ? last_frame_len : buf_size;
         memcpy(frame_buf, last_frame_bytes, copy_len);
+    }
+}
+
+void nsp_handler_get_last_rx_cmd(uint8_t* cmd_buf, size_t buf_size, uint32_t* cmd_len) {
+    if (cmd_len) *cmd_len = last_rx_cmd_len;
+    if (cmd_buf && buf_size > 0) {
+        size_t copy_len = last_rx_cmd_len < buf_size ? last_rx_cmd_len : buf_size;
+        memcpy(cmd_buf, last_rx_cmd_bytes, copy_len);
     }
 }
 

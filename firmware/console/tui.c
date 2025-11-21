@@ -674,20 +674,10 @@ void tui_print_header(void) {
                            g_test_results.total_tests,
                            g_test_results.all_passed ? ANSI_FG_GREEN "✓" ANSI_RESET : ANSI_FG_RED "✗" ANSI_RESET);
 
-    // Print header line 1
-    printf("%s", header_buf);
+    // Print header line 1 with newline (ANSI codes don't affect terminal width)
+    printf("%s\n", header_buf);
 
-    // Calculate visible length (excluding ANSI codes)
-    // Approximate: count only printable characters
-    int visible_len = 16 + 8 + 23 + 8 + 10;  // Approximate without ANSI codes
-    int padding = CONSOLE_WIDTH - visible_len;
-    if (padding > 0) {
-        for (int i = 0; i < padding; i++) {
-            putchar(' ');
-        }
-    }
-
-    printf("\n");
+    (void)written;  // Suppress unused variable warning
 
     // Line 2: Build info
     printf(ANSI_DIM "Build: %s %s | RP2040 Dual-Core @ 125MHz" ANSI_RESET "\n",

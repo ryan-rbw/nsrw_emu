@@ -22,4 +22,13 @@ void table_nsp_init(void);
  */
 void table_nsp_update(void);
 
+/**
+ * @brief Get formatted last RX command string
+ *
+ * Returns a string like "01,00,82,A5,3F" or "-" if no command received yet
+ *
+ * @return Pointer to static string buffer (valid until next table_nsp_update)
+ */
+const char* table_nsp_get_last_rx_cmd_str(void);
+
 #endif // TABLE_NSP_H

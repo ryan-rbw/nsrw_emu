@@ -28,6 +28,9 @@ static volatile uint32_t nsp_last_parse_error = 0;    // Last parse error code
 static volatile uint32_t nsp_last_cmd_error = 0;      // Last command error code
 static volatile uint32_t nsp_last_frame_len = 0;      // Last frame length in bytes
 
+// Last RX command (formatted as hex string)
+static char last_rx_cmd_str[64] = "-";  // Format: "01,00,82,..." or "-" if none
+
 // Enum string lookup for parse error codes (index = error code)
 static const char* parse_error_strings[] = {
     "NONE",         // 0
@@ -226,4 +229,26 @@ void table_nsp_update(void) {
     nsp_last_parse_error = last_parse;
     nsp_last_cmd_error = last_cmd;
     nsp_last_frame_len = frame_len;
+
+    // Fetch and format last RX command
+    uint8_t cmd_bytes[16];
+    uint32_t cmd_len;
+    nsp_handler_get_last_rx_cmd(cmd_bytes, sizeof(cmd_bytes), &cmd_len);
+
+    if (cmd_len == 0) {
+        snprintf(last_rx_cmd_str, sizeof(last_rx_cmd_str), "-");
+    } else {
+        char *ptr = last_rx_cmd_str;
+        size_t remaining = sizeof(last_rx_cmd_str);
+        for (uint32_t i = 0; i < cmd_len && i < 16; i++) {
+            int written = snprintf(ptr, remaining, "%s%02X", (i == 0) ? "" : ",", cmd_bytes[i]);
+            if (written < 0 || (size_t)written >= remaining) break;
+            ptr += written;
+            remaining -= written;
+        }
+    }
+}
+
+const char* table_nsp_get_last_rx_cmd_str(void) {
+    return last_rx_cmd_str;
 }
