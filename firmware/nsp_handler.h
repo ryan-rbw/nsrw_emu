@@ -67,6 +67,14 @@ void nsp_handler_get_detailed_stats(uint32_t* rx_bytes, uint32_t* rx_packets,
                                      uint32_t* cmd_errors, uint32_t* total_errors);
 
 /**
+ * @brief Get last error details for debugging
+ *
+ * @param last_parse_err Last NSP parse error code (0=none, 1=TOO_SHORT, 2=BAD_LENGTH, 3=BAD_CRC, 4=NULL_PTR)
+ * @param last_cmd_err Last unrecognized command code
+ */
+void nsp_handler_get_error_details(uint32_t* last_parse_err, uint32_t* last_cmd_err);
+
+/**
  * @brief Enable or disable debug RX logging
  *
  * When enabled, prints detailed information about received bytes and packet processing.

@@ -70,7 +70,7 @@
 /**
  * @brief Print startup banner with version info
  */
-static void print_banner(void) {
+static void print_banner(uint8_t device_addr) {
     // Get unique board ID
     pico_unique_board_id_t board_id;
     pico_get_unique_board_id(&board_id);
@@ -82,9 +82,10 @@ static void print_banner(void) {
     printf("NRWA-T6 Emulator %s\n", FIRMWARE_VERSION);
     printf("Build: %s %s | RP2040 Dual-Core @ 125MHz\n", BUILD_DATE, BUILD_TIME);
     printf("NewSpace NRWA-T6 Compatible | 100Hz Physics Engine\n");
-    printf("Board: %02X%02X%02X%02X%02X%02X%02X%02X\n\n",
+    printf("Board: %02X%02X%02X%02X%02X%02X%02X%02X | Device Address: 0x%02X\n\n",
            board_id.id[0], board_id.id[1], board_id.id[2], board_id.id[3],
-           board_id.id[4], board_id.id[5], board_id.id[6], board_id.id[7]);
+           board_id.id[4], board_id.id[5], board_id.id[6], board_id.id[7],
+           device_addr);
 }
 
 // ============================================================================
@@ -266,14 +267,14 @@ int main(void) {
     // Small delay for USB enumeration
     sleep_ms(2000);
 
-    // Print startup banner
-    print_banner();
-
-    printf("[Core0] Initializing hardware...\n");
-
-    // Phase 2: Initialize platform layer
+    // Initialize GPIO first to read device address
     gpio_init_all();
     uint8_t device_addr = gpio_read_address();
+
+    // Print startup banner with device address
+    print_banner(device_addr);
+
+    printf("[Core0] Initializing hardware...\n");
     printf("[Core0] Device address: 0x%02X (from ADDR pins)\n", device_addr);
 
     // Initialize timebase (100 Hz tick for Core1 physics)

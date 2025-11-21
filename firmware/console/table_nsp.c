@@ -23,6 +23,19 @@ static volatile uint32_t nsp_wrong_addr = 0;          // Wrong address packets
 static volatile uint32_t nsp_cmd_errors = 0;          // Command dispatch errors
 static volatile uint32_t nsp_total_errors = 0;        // Total errors
 
+// Last error details
+static volatile uint32_t nsp_last_parse_error = 0;    // Last parse error code
+static volatile uint32_t nsp_last_cmd_error = 0;      // Last command error code
+
+// Enum string lookup for parse error codes (index = error code)
+static const char* parse_error_strings[] = {
+    "NONE",         // 0
+    "TOO_SHORT",    // 1
+    "BAD_LENGTH",   // 2
+    "BAD_CRC",      // 3
+    "NULL_PTR",     // 4
+};
+
 // ============================================================================
 // Field Definitions
 // ============================================================================
@@ -124,6 +137,30 @@ static const field_meta_t nsp_fields[] = {
         .enum_values = NULL,
         .enum_count = 0,
     },
+    {
+        .id = 309,
+        .name = "last_parse_err",
+        .type = FIELD_TYPE_ENUM,
+        .units = "",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&nsp_last_parse_error,
+        .dirty = false,
+        .enum_values = parse_error_strings,
+        .enum_count = sizeof(parse_error_strings) / sizeof(parse_error_strings[0]),
+    },
+    {
+        .id = 310,
+        .name = "last_cmd_err",
+        .type = FIELD_TYPE_U32,
+        .units = "0xNN",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)&nsp_last_cmd_error,
+        .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
+    },
 };
 
 // ============================================================================
@@ -167,4 +204,10 @@ void table_nsp_update(void) {
     nsp_wrong_addr = wrong_a;
     nsp_cmd_errors = cmd_e;
     nsp_total_errors = total_e;
+
+    // Fetch error details
+    uint32_t last_parse, last_cmd;
+    nsp_handler_get_error_details(&last_parse, &last_cmd);
+    nsp_last_parse_error = last_parse;
+    nsp_last_cmd_error = last_cmd;
 }

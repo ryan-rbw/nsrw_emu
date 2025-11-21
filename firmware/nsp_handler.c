@@ -31,6 +31,10 @@ static uint32_t nsp_parse_error_count = 0;
 static uint32_t wrong_addr_count = 0;
 static uint32_t cmd_dispatch_error_count = 0;
 
+// Last error details (for debugging)
+static uint32_t last_parse_error_code = 0;     // Last NSP parse error code (0=none, 1-4=error)
+static uint32_t last_cmd_error_code = 0;       // Last unrecognized command code
+
 // Debug flag (set to false to disable verbose logging after initial testing)
 static bool debug_rx = true;
 
@@ -66,6 +70,8 @@ void nsp_handler_init(uint8_t device_address) {
     nsp_parse_error_count = 0;
     wrong_addr_count = 0;
     cmd_dispatch_error_count = 0;
+    last_parse_error_code = 0;
+    last_cmd_error_code = 0;
 }
 
 // ============================================================================
@@ -119,6 +125,7 @@ void nsp_handler_poll(void) {
                 // NSP parse error (CRC, length, etc.)
                 nsp_parse_error_count++;
                 error_count++;
+                last_parse_error_code = (uint32_t)parse_result;  // Save error code for debugging
                 if (debug_rx) {
                     printf("[NSP] Parse error: %d (CRC/length/format)\n", parse_result);
                 }
@@ -157,6 +164,7 @@ void nsp_handler_poll(void) {
                 // Unrecognized command
                 cmd_dispatch_error_count++;
                 error_count++;
+                last_cmd_error_code = (uint32_t)command;  // Save unrecognized command code
                 if (debug_rx) {
                     printf("[NSP] Command dispatch failed: 0x%02X (unrecognized)\n", command);
                 }
@@ -244,6 +252,11 @@ void nsp_handler_get_detailed_stats(uint32_t* rx_bytes, uint32_t* rx_packets,
     if (wrong_addr) *wrong_addr = wrong_addr_count;
     if (cmd_errors) *cmd_errors = cmd_dispatch_error_count;
     if (total_errors) *total_errors = error_count;
+}
+
+void nsp_handler_get_error_details(uint32_t* last_parse_err, uint32_t* last_cmd_err) {
+    if (last_parse_err) *last_parse_err = last_parse_error_code;
+    if (last_cmd_err) *last_cmd_err = last_cmd_error_code;
 }
 
 void nsp_handler_set_debug(bool enable) {
