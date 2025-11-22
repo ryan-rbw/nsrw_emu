@@ -40,7 +40,7 @@ static uint8_t last_rx_cmd_bytes[16] = {0};    // Last successfully parsed comma
 static uint32_t last_rx_cmd_len = 0;           // Length of last RX command
 
 // Debug flag (set to false to disable verbose logging after initial testing)
-static bool debug_rx = true;
+static bool debug_rx = false;
 
 // ============================================================================
 // Initialization
