@@ -172,15 +172,6 @@ void nsp_handler_poll(void) {
             last_rx_cmd_len = decoded_len < sizeof(last_rx_cmd_bytes) ? decoded_len : sizeof(last_rx_cmd_bytes);
             memcpy(last_rx_cmd_bytes, slip_output_buf, last_rx_cmd_len);
 
-            // Print last RX command as comma-separated hex
-            if (debug_rx && last_rx_cmd_len > 0) {
-                printf("[NSP] Last RX cmd: ");
-                for (uint32_t i = 0; i < last_rx_cmd_len; i++) {
-                    printf("%s%02X", (i == 0) ? "" : ",", last_rx_cmd_bytes[i]);
-                }
-                printf("\n");
-            }
-
             // Reset error fields on successful parse (don't show stale errors)
             last_parse_error_code = 0;
             last_cmd_error_code = 0;
