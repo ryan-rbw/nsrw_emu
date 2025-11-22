@@ -79,6 +79,7 @@ typedef struct {
 
     // Protection status
     uint32_t fault_status;      // Active faults (bitmask)
+    uint32_t fault_latch;       // Latched faults (bitmask)
     uint32_t warning_status;    // Active warnings (bitmask)
     bool lcl_tripped;           // LCL trip flag
 

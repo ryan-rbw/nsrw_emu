@@ -379,8 +379,34 @@ void cmd_application_telemetry(const uint8_t* payload, uint16_t payload_len, cmd
     uint8_t block_id = payload[0];
     if (debug_commands) printf("[CMD] APP-TELEM: block_id=%u\n", block_id);
 
-    // Build telemetry block (delegated to telemetry module)
-    uint16_t block_len = telemetry_build_block(block_id, g_wheel_state, response_buffer, sizeof(response_buffer));
+    // Read latest telemetry snapshot from Core1 (thread-safe)
+    telemetry_snapshot_t snapshot;
+    if (!core_sync_read_telemetry(&snapshot)) {
+        // No telemetry available yet (Core1 not started?)
+        if (debug_commands) printf("[CMD] APP-TELEM: No telemetry available\n");
+        build_nack(result);
+        return;
+    }
+
+    // Build temporary wheel_state from snapshot for telemetry builder
+    // This avoids race condition by using atomic snapshot
+    wheel_state_t temp_state = {0};
+    temp_state.omega_rad_s = snapshot.omega_rad_s;
+    temp_state.momentum_nms = snapshot.momentum_nms;
+    temp_state.current_out_a = snapshot.current_a;
+    temp_state.torque_out_mnm = snapshot.torque_mnm;
+    temp_state.power_w = snapshot.power_w;
+    temp_state.voltage_v = snapshot.voltage_v;
+    temp_state.mode = snapshot.mode;
+    temp_state.direction = snapshot.direction;
+    temp_state.fault_status = snapshot.fault_status;
+    temp_state.fault_latch = snapshot.fault_latch;
+    temp_state.warning_status = snapshot.warning_status;
+    temp_state.lcl_tripped = snapshot.lcl_tripped;
+    temp_state.tick_count = snapshot.tick_count;
+
+    // Build telemetry block from snapshot
+    uint16_t block_len = telemetry_build_block(block_id, &temp_state, response_buffer, sizeof(response_buffer));
 
     if (block_len == 0) {
         if (debug_commands) printf("[CMD] APP-TELEM: Invalid block ID or error\n");

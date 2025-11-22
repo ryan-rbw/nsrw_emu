@@ -122,10 +122,6 @@ bool test_mode_activate(wheel_state_t* state, test_mode_id_t mode_id) {
 
     const test_mode_desc_t* desc = &test_mode_table[mode_id];
 
-    printf("[TEST_MODE] Activating: %s\n", desc->name);
-    printf("  Description: %s\n", desc->description);
-    printf("  Mode: %d, Setpoint: %.1f\n", desc->mode, desc->setpoint);
-
     // Set control mode (this will reset old mode's state)
     wheel_model_set_mode(state, desc->mode);
 
@@ -133,56 +129,49 @@ bool test_mode_activate(wheel_state_t* state, test_mode_id_t mode_id) {
     switch (desc->mode) {
         case CONTROL_MODE_CURRENT:
             wheel_model_set_current(state, desc->setpoint);
-            printf("  Current setpoint: %.2f A\n", desc->setpoint);
             break;
 
         case CONTROL_MODE_SPEED:
             wheel_model_set_speed(state, desc->setpoint);
-            printf("  Speed setpoint: %.0f RPM\n", desc->setpoint);
             break;
 
         case CONTROL_MODE_TORQUE:
             wheel_model_set_torque(state, desc->setpoint);
-            printf("  Torque setpoint: %.1f mN·m\n", desc->setpoint);
             break;
 
         case CONTROL_MODE_PWM:
             wheel_model_set_pwm(state, desc->setpoint);
-            printf("  PWM duty cycle: %.2f%%\n", desc->setpoint);
             break;
 
         default:
-            printf("  [ERROR] Invalid mode in test descriptor\n");
             return false;
     }
 
-    if (desc->expect_fault) {
-        printf("  ⚠️  WARNING: This test mode is expected to trigger a fault\n");
-    }
-
-    if (desc->duration_s > 0.0f) {
-        printf("  Expected settling time: %.1f seconds\n", desc->duration_s);
-    } else {
-        printf("  Continuous operation (no settling expected)\n");
-    }
-
     active_test_mode = mode_id;
+
+    // Single consolidated printf to avoid blocking NSP handler
+    // (USB-CDC printf can block if buffer fills, causing NSP timeouts)
+    printf("[TEST_MODE] %s: %.1f %s\n", desc->name, desc->setpoint,
+           desc->mode == CONTROL_MODE_CURRENT ? "A" :
+           desc->mode == CONTROL_MODE_SPEED ? "RPM" :
+           desc->mode == CONTROL_MODE_TORQUE ? "mNm" : "%");
+
     return true;
 }
 
 void test_mode_deactivate(wheel_state_t* state) {
     if (!state) return;
 
-    if (active_test_mode != TEST_MODE_NONE) {
-        printf("[TEST_MODE] Deactivating: %s\n", test_mode_table[active_test_mode].name);
-    }
-
     // Return to safe idle state
     wheel_model_set_mode(state, CONTROL_MODE_CURRENT);
     wheel_model_set_current(state, 0.0f);
 
+    // Single printf to avoid blocking NSP handler
+    if (active_test_mode != TEST_MODE_NONE) {
+        printf("[TEST_MODE] Deactivated %s, returned to idle\n", test_mode_table[active_test_mode].name);
+    }
+
     active_test_mode = TEST_MODE_NONE;
-    printf("[TEST_MODE] Returned to idle (CURRENT mode, 0 A)\n");
 }
 
 test_mode_id_t test_mode_get_active(void) {

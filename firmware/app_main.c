@@ -227,6 +227,7 @@ void core1_main(void) {
         snapshot.mode = g_wheel_state.mode;
         snapshot.direction = g_wheel_state.direction;
         snapshot.fault_status = g_wheel_state.fault_status;
+        snapshot.fault_latch = g_wheel_state.fault_latch;
         snapshot.warning_status = g_wheel_state.warning_status;
         snapshot.lcl_tripped = g_wheel_state.lcl_tripped;
         snapshot.tick_count = g_wheel_state.tick_count;
