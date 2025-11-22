@@ -12,6 +12,10 @@
 #include "util/core_sync.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
+
+// Debug flag (set to false to disable verbose command logging)
+static bool debug_commands = false;
 
 // ============================================================================
 // Global State
@@ -285,13 +289,13 @@ void cmd_ping(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result
     (void)payload;
     (void)payload_len;
 
-    printf("[CMD] PING\n");
+    if (debug_commands) printf("[CMD] PING\n");
     build_ack(result);
 }
 
 void cmd_peek(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result) {
     if (payload_len != 3) {
-        printf("[CMD] PEEK: Invalid payload length %u (expected 3)\n", payload_len);
+        if (debug_commands) printf("[CMD] PEEK: Invalid payload length %u (expected 3)\n", payload_len);
         build_nack(result);
         return;
     }
@@ -299,11 +303,11 @@ void cmd_peek(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result
     uint16_t start_addr = (payload[0] << 8) | payload[1];
     uint8_t count = payload[2];
 
-    printf("[CMD] PEEK: addr=0x%04X, count=%u\n", start_addr, count);
+    if (debug_commands) printf("[CMD] PEEK: addr=0x%04X, count=%u\n", start_addr, count);
 
     // Validate access
     if (!validate_register_access(start_addr, count, false)) {
-        printf("[CMD] PEEK: Invalid register access\n");
+        if (debug_commands) printf("[CMD] PEEK: Invalid register access\n");
         build_nack(result);
         return;
     }
@@ -312,7 +316,7 @@ void cmd_peek(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result
     uint8_t* data = response_buffer;
     for (uint8_t i = 0; i < count; i++) {
         if (!read_register(start_addr + (i * 4), data)) {
-            printf("[CMD] PEEK: Failed to read register 0x%04X\n", start_addr + (i * 4));
+            if (debug_commands) printf("[CMD] PEEK: Failed to read register 0x%04X\n", start_addr + (i * 4));
             build_nack(result);
             return;
         }
@@ -321,12 +325,12 @@ void cmd_peek(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result
 
     // Build ACK with data
     build_ack_with_data(result, response_buffer, count * 4);
-    printf("[CMD] PEEK: Success, %u bytes\n", count * 4);
+    if (debug_commands) printf("[CMD] PEEK: Success, %u bytes\n", count * 4);
 }
 
 void cmd_poke(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result) {
     if (payload_len < 3) {
-        printf("[CMD] POKE: Invalid payload length %u (expected >=3)\n", payload_len);
+        if (debug_commands) printf("[CMD] POKE: Invalid payload length %u (expected >=3)\n", payload_len);
         build_nack(result);
         return;
     }
@@ -334,18 +338,18 @@ void cmd_poke(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result
     uint16_t start_addr = (payload[0] << 8) | payload[1];
     uint8_t count = payload[2];
 
-    printf("[CMD] POKE: addr=0x%04X, count=%u\n", start_addr, count);
+    if (debug_commands) printf("[CMD] POKE: addr=0x%04X, count=%u\n", start_addr, count);
 
     // Validate payload length
     if (payload_len != (3 + count * 4)) {
-        printf("[CMD] POKE: Payload length mismatch\n");
+        if (debug_commands) printf("[CMD] POKE: Payload length mismatch\n");
         build_nack(result);
         return;
     }
 
     // Validate access
     if (!validate_register_access(start_addr, count, true)) {
-        printf("[CMD] POKE: Invalid register access (read-only or out of range)\n");
+        if (debug_commands) printf("[CMD] POKE: Invalid register access (read-only or out of range)\n");
         build_nack(result);
         return;
     }
@@ -354,7 +358,7 @@ void cmd_poke(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result
     const uint8_t* data = &payload[3];
     for (uint8_t i = 0; i < count; i++) {
         if (!write_register(start_addr + (i * 4), data)) {
-            printf("[CMD] POKE: Failed to write register 0x%04X\n", start_addr + (i * 4));
+            if (debug_commands) printf("[CMD] POKE: Failed to write register 0x%04X\n", start_addr + (i * 4));
             build_nack(result);
             return;
         }
@@ -362,41 +366,41 @@ void cmd_poke(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result
     }
 
     build_ack(result);
-    printf("[CMD] POKE: Success\n");
+    if (debug_commands) printf("[CMD] POKE: Success\n");
 }
 
 void cmd_application_telemetry(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result) {
     if (payload_len != 1) {
-        printf("[CMD] APP-TELEM: Invalid payload length %u (expected 1)\n", payload_len);
+        if (debug_commands) printf("[CMD] APP-TELEM: Invalid payload length %u (expected 1)\n", payload_len);
         build_nack(result);
         return;
     }
 
     uint8_t block_id = payload[0];
-    printf("[CMD] APP-TELEM: block_id=%u\n", block_id);
+    if (debug_commands) printf("[CMD] APP-TELEM: block_id=%u\n", block_id);
 
     // Build telemetry block (delegated to telemetry module)
     uint16_t block_len = telemetry_build_block(block_id, g_wheel_state, response_buffer, sizeof(response_buffer));
 
     if (block_len == 0) {
-        printf("[CMD] APP-TELEM: Invalid block ID or error\n");
+        if (debug_commands) printf("[CMD] APP-TELEM: Invalid block ID or error\n");
         build_nack(result);
         return;
     }
 
     build_ack_with_data(result, response_buffer, block_len);
-    printf("[CMD] APP-TELEM: Success, %u bytes\n", block_len);
+    if (debug_commands) printf("[CMD] APP-TELEM: Success, %u bytes\n", block_len);
 }
 
 void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result) {
     if (payload_len < 1) {
-        printf("[CMD] APP-CMD: Invalid payload length %u\n", payload_len);
+        if (debug_commands) printf("[CMD] APP-CMD: Invalid payload length %u\n", payload_len);
         build_nack(result);
         return;
     }
 
     uint8_t subcmd = payload[0];
-    printf("[CMD] APP-CMD: subcmd=0x%02X\n", subcmd);
+    if (debug_commands) printf("[CMD] APP-CMD: subcmd=0x%02X\n", subcmd);
 
     switch (subcmd) {
         case 0x00: // SET-MODE
@@ -406,10 +410,10 @@ void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_r
             }
             if (payload[1] <= CONTROL_MODE_PWM) {
                 wheel_model_set_mode(g_wheel_state, (control_mode_t)payload[1]);
-                printf("[CMD] APP-CMD: Set mode=%u\n", payload[1]);
+                if (debug_commands) printf("[CMD] APP-CMD: Set mode=%u\n", payload[1]);
                 build_ack(result);
             } else {
-                printf("[CMD] APP-CMD: Invalid mode=%u\n", payload[1]);
+                if (debug_commands) printf("[CMD] APP-CMD: Invalid mode=%u\n", payload[1]);
                 build_nack(result);
             }
             break;
@@ -423,7 +427,7 @@ void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_r
                 uint32_t speed_uq = (payload[1] << 24) | (payload[2] << 16) | (payload[3] << 8) | payload[4];
                 float speed_rpm = uq14_18_to_float(speed_uq);
                 wheel_model_set_speed(g_wheel_state, speed_rpm);
-                printf("[CMD] APP-CMD: Set speed=%.1f RPM\n", speed_rpm);
+                if (debug_commands) printf("[CMD] APP-CMD: Set speed=%.1f RPM\n", speed_rpm);
                 build_ack(result);
             }
             break;
@@ -437,7 +441,7 @@ void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_r
                 uint32_t current_uq = (payload[1] << 24) | (payload[2] << 16) | (payload[3] << 8) | payload[4];
                 float current_ma = uq18_14_to_float(current_uq);
                 wheel_model_set_current(g_wheel_state, current_ma / 1000.0f);
-                printf("[CMD] APP-CMD: Set current=%.3f A\n", current_ma / 1000.0f);
+                if (debug_commands) printf("[CMD] APP-CMD: Set current=%.3f A\n", current_ma / 1000.0f);
                 build_ack(result);
             }
             break;
@@ -451,7 +455,7 @@ void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_r
                 uint32_t torque_uq = (payload[1] << 24) | (payload[2] << 16) | (payload[3] << 8) | payload[4];
                 float torque_mnm = uq18_14_to_float(torque_uq);
                 wheel_model_set_torque(g_wheel_state, torque_mnm);
-                printf("[CMD] APP-CMD: Set torque=%.1f mN·m\n", torque_mnm);
+                if (debug_commands) printf("[CMD] APP-CMD: Set torque=%.1f mN·m\n", torque_mnm);
                 build_ack(result);
             }
             break;
@@ -465,7 +469,7 @@ void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_r
                 uint16_t duty_uq = (payload[1] << 8) | payload[2];
                 float duty_pct = uq8_8_to_float(duty_uq);
                 wheel_model_set_pwm(g_wheel_state, duty_pct);
-                printf("[CMD] APP-CMD: Set PWM=%.2f%%\n", duty_pct);
+                if (debug_commands) printf("[CMD] APP-CMD: Set PWM=%.2f%%\n", duty_pct);
                 build_ack(result);
             }
             break;
@@ -477,16 +481,16 @@ void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_r
             }
             if (payload[1] <= DIRECTION_NEGATIVE) {
                 wheel_model_set_direction(g_wheel_state, (direction_t)payload[1]);
-                printf("[CMD] APP-CMD: Set direction=%u\n", payload[1]);
+                if (debug_commands) printf("[CMD] APP-CMD: Set direction=%u\n", payload[1]);
                 build_ack(result);
             } else {
-                printf("[CMD] APP-CMD: Invalid direction=%u\n", payload[1]);
+                if (debug_commands) printf("[CMD] APP-CMD: Invalid direction=%u\n", payload[1]);
                 build_nack(result);
             }
             break;
 
         default:
-            printf("[CMD] APP-CMD: Unknown subcommand 0x%02X\n", subcmd);
+            if (debug_commands) printf("[CMD] APP-CMD: Unknown subcommand 0x%02X\n", subcmd);
             build_nack(result);
             break;
     }
@@ -494,20 +498,20 @@ void cmd_application_command(const uint8_t* payload, uint16_t payload_len, cmd_r
 
 void cmd_clear_fault(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result) {
     if (payload_len != 4) {
-        printf("[CMD] CLEAR-FAULT: Invalid payload length %u (expected 4)\n", payload_len);
+        if (debug_commands) printf("[CMD] CLEAR-FAULT: Invalid payload length %u (expected 4)\n", payload_len);
         build_nack(result);
         return;
     }
 
     uint32_t fault_mask = (payload[0] << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3];
-    printf("[CMD] CLEAR-FAULT: mask=0x%08X\n", fault_mask);
+    if (debug_commands) printf("[CMD] CLEAR-FAULT: mask=0x%08X\n", fault_mask);
 
     // Clear faults (does NOT clear LCL trip)
     wheel_model_clear_faults(g_wheel_state, fault_mask);
 
     // Check if LCL is still tripped
     if (wheel_model_is_lcl_tripped(g_wheel_state)) {
-        printf("[CMD] CLEAR-FAULT: LCL still tripped (requires hardware RESET)\n");
+        if (debug_commands) printf("[CMD] CLEAR-FAULT: LCL still tripped (requires hardware RESET)\n");
     }
 
     build_ack(result);
@@ -515,54 +519,54 @@ void cmd_clear_fault(const uint8_t* payload, uint16_t payload_len, cmd_result_t*
 
 void cmd_configure_protection(const uint8_t* payload, uint16_t payload_len, cmd_result_t* result) {
     if (payload_len != 5) {
-        printf("[CMD] CONFIG-PROT: Invalid payload length %u (expected 5)\n", payload_len);
+        if (debug_commands) printf("[CMD] CONFIG-PROT: Invalid payload length %u (expected 5)\n", payload_len);
         build_nack(result);
         return;
     }
 
     uint8_t param_id = payload[0];
     uint32_t value = (payload[1] << 24) | (payload[2] << 16) | (payload[3] << 8) | payload[4];
-    printf("[CMD] CONFIG-PROT: param_id=%u, value=0x%08X\n", param_id, value);
+    if (debug_commands) printf("[CMD] CONFIG-PROT: param_id=%u, value=0x%08X\n", param_id, value);
 
     switch (param_id) {
         case 0x00: // Overvoltage threshold (V, UQ16.16)
             g_wheel_state->overvoltage_threshold_v = uq16_16_to_float(value);
-            printf("[CMD] CONFIG-PROT: Overvoltage threshold = %.2f V\n", g_wheel_state->overvoltage_threshold_v);
+            if (debug_commands) printf("[CMD] CONFIG-PROT: Overvoltage threshold = %.2f V\n", g_wheel_state->overvoltage_threshold_v);
             build_ack(result);
             break;
 
         case 0x01: // Overspeed fault (RPM, UQ14.18)
             g_wheel_state->overspeed_fault_rpm = uq14_18_to_float(value);
-            printf("[CMD] CONFIG-PROT: Overspeed fault = %.1f RPM\n", g_wheel_state->overspeed_fault_rpm);
+            if (debug_commands) printf("[CMD] CONFIG-PROT: Overspeed fault = %.1f RPM\n", g_wheel_state->overspeed_fault_rpm);
             build_ack(result);
             break;
 
         case 0x02: // Overspeed soft (RPM, UQ14.18)
             g_wheel_state->overspeed_soft_rpm = uq14_18_to_float(value);
-            printf("[CMD] CONFIG-PROT: Overspeed soft = %.1f RPM\n", g_wheel_state->overspeed_soft_rpm);
+            if (debug_commands) printf("[CMD] CONFIG-PROT: Overspeed soft = %.1f RPM\n", g_wheel_state->overspeed_soft_rpm);
             build_ack(result);
             break;
 
         case 0x03: // Max duty cycle (%, UQ8.8)
             g_wheel_state->max_duty_cycle_pct = uq8_8_to_float(value & 0xFFFF);
-            printf("[CMD] CONFIG-PROT: Max duty = %.2f%%\n", g_wheel_state->max_duty_cycle_pct);
+            if (debug_commands) printf("[CMD] CONFIG-PROT: Max duty = %.2f%%\n", g_wheel_state->max_duty_cycle_pct);
             build_ack(result);
             break;
 
         case 0x04: // Motor overpower (W, UQ16.16)
             g_wheel_state->motor_overpower_limit_w = uq16_16_to_float(value);
-            printf("[CMD] CONFIG-PROT: Motor overpower = %.1f W\n", g_wheel_state->motor_overpower_limit_w);
+            if (debug_commands) printf("[CMD] CONFIG-PROT: Motor overpower = %.1f W\n", g_wheel_state->motor_overpower_limit_w);
             build_ack(result);
             break;
 
         case 0x05: // Soft overcurrent (A, UQ16.16)
             g_wheel_state->soft_overcurrent_a = uq16_16_to_float(value);
-            printf("[CMD] CONFIG-PROT: Soft overcurrent = %.2f A\n", g_wheel_state->soft_overcurrent_a);
+            if (debug_commands) printf("[CMD] CONFIG-PROT: Soft overcurrent = %.2f A\n", g_wheel_state->soft_overcurrent_a);
             build_ack(result);
             break;
 
         default:
-            printf("[CMD] CONFIG-PROT: Invalid parameter ID %u\n", param_id);
+            if (debug_commands) printf("[CMD] CONFIG-PROT: Invalid parameter ID %u\n", param_id);
             build_nack(result);
             break;
     }
@@ -572,7 +576,7 @@ void cmd_trip_lcl(const uint8_t* payload, uint16_t payload_len, cmd_result_t* re
     (void)payload;
     (void)payload_len;
 
-    printf("[CMD] TRIP-LCL: Triggering LCL\n");
+    if (debug_commands) printf("[CMD] TRIP-LCL: Triggering LCL\n");
     wheel_model_trip_lcl(g_wheel_state);
     build_ack(result);
 }

@@ -7,6 +7,10 @@
 #include "fixedpoint.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
+
+// Debug flag (set to false to disable verbose telemetry logging)
+static bool debug_telemetry = false;
 
 // ============================================================================
 // Helper Functions
@@ -62,7 +66,7 @@ uint16_t telemetry_build_block(uint8_t block_id, const wheel_state_t* state, uin
             return telemetry_build_diagnostics(state, buffer, buffer_size);
 
         default:
-            printf("[TELEM] Invalid block ID: %u\n", block_id);
+            if (debug_telemetry) printf("[TELEM] Invalid block ID: %u\n", block_id);
             return 0;
     }
 }
@@ -75,7 +79,7 @@ uint16_t telemetry_build_standard(const wheel_state_t* state, uint8_t* buffer, u
     const uint16_t required_size = 38;  // Total block size
 
     if (buffer_size < required_size) {
-        printf("[TELEM] STANDARD: Buffer too small (%u < %u)\n", buffer_size, required_size);
+        if (debug_telemetry) printf("[TELEM] STANDARD: Buffer too small (%u < %u)\n", buffer_size, required_size);
         return 0;
     }
 
@@ -123,7 +127,7 @@ uint16_t telemetry_build_standard(const wheel_state_t* state, uint8_t* buffer, u
     float momentum_unms = state->momentum_nms * 1e6f;
     write_u32(&buf, float_to_uq18_14(momentum_unms));
 
-    printf("[TELEM] STANDARD: %u bytes (speed=%.1f RPM, current=%.3f A, power=%.1f W)\n",
+    if (debug_telemetry) printf("[TELEM] STANDARD: %u bytes (speed=%.1f RPM, current=%.3f A, power=%.1f W)\n",
            required_size, speed_rpm, state->current_out_a, state->power_w);
 
     return required_size;
@@ -135,7 +139,7 @@ uint16_t telemetry_build_temperatures(const wheel_state_t* state, uint8_t* buffe
     const uint16_t required_size = 6;
 
     if (buffer_size < required_size) {
-        printf("[TELEM] TEMPERATURES: Buffer too small\n");
+        if (debug_telemetry) printf("[TELEM] TEMPERATURES: Buffer too small\n");
         return 0;
     }
 
@@ -150,7 +154,7 @@ uint16_t telemetry_build_temperatures(const wheel_state_t* state, uint8_t* buffe
     write_u16(&buf, float_to_uq8_8(driver_temp));
     write_u16(&buf, float_to_uq8_8(board_temp));
 
-    printf("[TELEM] TEMPERATURES: %u bytes (motor=%.1f°C, driver=%.1f°C, board=%.1f°C)\n",
+    if (debug_telemetry) printf("[TELEM] TEMPERATURES: %u bytes (motor=%.1f°C, driver=%.1f°C, board=%.1f°C)\n",
            required_size, motor_temp, driver_temp, board_temp);
 
     return required_size;
@@ -160,7 +164,7 @@ uint16_t telemetry_build_voltages(const wheel_state_t* state, uint8_t* buffer, u
     const uint16_t required_size = 12;
 
     if (buffer_size < required_size) {
-        printf("[TELEM] VOLTAGES: Buffer too small\n");
+        if (debug_telemetry) printf("[TELEM] VOLTAGES: Buffer too small\n");
         return 0;
     }
 
@@ -178,7 +182,7 @@ uint16_t telemetry_build_voltages(const wheel_state_t* state, uint8_t* buffer, u
     write_u32(&buf, float_to_uq16_16(phase_a_voltage));
     write_u32(&buf, float_to_uq16_16(phase_b_voltage));
 
-    printf("[TELEM] VOLTAGES: %u bytes (bus=%.1fV, phase_a=%.1fV, phase_b=%.1fV)\n",
+    if (debug_telemetry) printf("[TELEM] VOLTAGES: %u bytes (bus=%.1fV, phase_a=%.1fV, phase_b=%.1fV)\n",
            required_size, bus_voltage, phase_a_voltage, phase_b_voltage);
 
     return required_size;
@@ -188,7 +192,7 @@ uint16_t telemetry_build_currents(const wheel_state_t* state, uint8_t* buffer, u
     const uint16_t required_size = 12;
 
     if (buffer_size < required_size) {
-        printf("[TELEM] CURRENTS: Buffer too small\n");
+        if (debug_telemetry) printf("[TELEM] CURRENTS: Buffer too small\n");
         return 0;
     }
 
@@ -205,7 +209,7 @@ uint16_t telemetry_build_currents(const wheel_state_t* state, uint8_t* buffer, u
     write_u32(&buf, float_to_uq18_14(phase_b_current_ma));
     write_u32(&buf, float_to_uq18_14(bus_current_ma));
 
-    printf("[TELEM] CURRENTS: %u bytes (phase_a=%.1fmA, phase_b=%.1fmA, bus=%.1fmA)\n",
+    if (debug_telemetry) printf("[TELEM] CURRENTS: %u bytes (phase_a=%.1fmA, phase_b=%.1fmA, bus=%.1fmA)\n",
            required_size, phase_a_current_ma, phase_b_current_ma, bus_current_ma);
 
     return required_size;
@@ -215,7 +219,7 @@ uint16_t telemetry_build_diagnostics(const wheel_state_t* state, uint8_t* buffer
     const uint16_t required_size = 18;
 
     if (buffer_size < required_size) {
-        printf("[TELEM] DIAGNOSTICS: Buffer too small\n");
+        if (debug_telemetry) printf("[TELEM] DIAGNOSTICS: Buffer too small\n");
         return 0;
     }
 
@@ -236,7 +240,7 @@ uint16_t telemetry_build_diagnostics(const wheel_state_t* state, uint8_t* buffer
     // Max jitter (placeholder - from timebase in Phase 10)
     write_u16(&buf, 0);
 
-    printf("[TELEM] DIAGNOSTICS: %u bytes (ticks=%u, uptime=%us)\n",
+    if (debug_telemetry) printf("[TELEM] DIAGNOSTICS: %u bytes (ticks=%u, uptime=%us)\n",
            required_size, state->tick_count, state->uptime_seconds);
 
     return required_size;
