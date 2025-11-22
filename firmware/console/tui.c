@@ -656,7 +656,7 @@ void tui_print_header(void) {
     char header_buf[CONSOLE_WIDTH + 1];
 
     // Print logo (centered)
-    printf("%s", LOGO_ART);
+    printf("%s\n", LOGO_ART);
 
     // Format header info to fit exactly 80 characters
     // Line 1: "NRWA-T6 Emulator VERSION    |    Uptime: HH:MM:SS    |    Tests: N/M ✓/✗"
