@@ -177,6 +177,18 @@ static const field_meta_t nsp_fields[] = {
         .enum_values = NULL,
         .enum_count = 0,
     },
+    {
+        .id = 312,
+        .name = "last_rx_cmd",
+        .type = FIELD_TYPE_STRING,
+        .units = "",
+        .access = FIELD_ACCESS_RO,
+        .default_val = 0,
+        .ptr = (volatile uint32_t*)last_rx_cmd_str,
+        .dirty = false,
+        .enum_values = NULL,
+        .enum_count = 0,
+    },
 };
 
 // ============================================================================
