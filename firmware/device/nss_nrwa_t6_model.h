@@ -27,10 +27,12 @@
 // Motor torque constant: k_t = 0.0534 N·m/A (from SPEC.md)
 #define MOTOR_KT_NM_PER_A       0.0534f      // N·m/A
 
-// Loss model coefficients (tuned for realistic behavior)
-#define LOSS_VISCOUS_A          0.00001f     // a·ω (N·m·s/rad)
-#define LOSS_COULOMB_B          0.0005f      // b·sign(ω) (N·m)
-#define LOSS_COPPER_C           0.0001f      // c·i² (N·m/A²)
+// Loss model coefficients (tuned for realistic NRWA-T6 behavior)
+// These values produce realistic coast-down times (~minutes from 6000 RPM)
+// and prevent runaway speed when motor current is disabled (LCL trip)
+#define LOSS_VISCOUS_A          0.000016f    // a·ω (N·m·s/rad) - 16 µN·m·s/rad
+#define LOSS_COULOMB_B          0.001f       // b·sign(ω) (N·m) - 1 mN·m static friction
+#define LOSS_COPPER_C           0.0001f      // c·i² (N·m/A²) - copper losses
 
 // Simulation timestep
 #define MODEL_DT_MS             10           // 10 ms (100 Hz)

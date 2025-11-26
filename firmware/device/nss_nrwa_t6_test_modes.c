@@ -4,6 +4,8 @@
  */
 
 #include "nss_nrwa_t6_test_modes.h"
+#include "util/core_sync.h"
+#include "pico/stdlib.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -121,36 +123,63 @@ bool test_mode_activate(wheel_state_t* state, test_mode_id_t mode_id) {
     }
 
     const test_mode_desc_t* desc = &test_mode_table[mode_id];
+    (void)state;  // State pointer not used - commands go through mailbox
 
-    // Set control mode (this will reset old mode's state)
-    wheel_model_set_mode(state, desc->mode);
+    // CRITICAL: Use inter-core command mailbox to send commands to Core1
+    // Direct writes to g_wheel_state cause race conditions because Core1
+    // is continuously updating the wheel state at 100 Hz.
 
-    // Set mode-specific setpoint
+    // Step 1: Set control mode via command mailbox
+    // Retry loop in case mailbox is busy (Core1 runs at 100Hz, so max ~10ms wait)
+    int retries = 20;  // 20 * 1ms = 20ms max wait
+    while (!core_sync_send_command(CMD_SET_MODE, (float)desc->mode, 0.0f) && retries > 0) {
+        sleep_ms(1);
+        retries--;
+    }
+    if (retries == 0) {
+        printf("[TEST_MODE] Failed to send mode command (mailbox busy)\n");
+        return false;
+    }
+
+    // Wait for Core1 to process the mode command (runs at 100Hz = 10ms period)
+    sleep_ms(15);
+
+    // Step 2: Set mode-specific setpoint via command mailbox
+    command_type_t setpoint_cmd;
     switch (desc->mode) {
         case CONTROL_MODE_CURRENT:
-            wheel_model_set_current(state, desc->setpoint);
+            setpoint_cmd = CMD_SET_CURRENT;
             break;
 
         case CONTROL_MODE_SPEED:
-            wheel_model_set_speed(state, desc->setpoint);
+            setpoint_cmd = CMD_SET_SPEED;
             break;
 
         case CONTROL_MODE_TORQUE:
-            wheel_model_set_torque(state, desc->setpoint);
+            setpoint_cmd = CMD_SET_TORQUE;
             break;
 
         case CONTROL_MODE_PWM:
-            wheel_model_set_pwm(state, desc->setpoint);
+            setpoint_cmd = CMD_SET_PWM;
             break;
 
         default:
             return false;
     }
 
+    retries = 20;
+    while (!core_sync_send_command(setpoint_cmd, desc->setpoint, 0.0f) && retries > 0) {
+        sleep_ms(1);
+        retries--;
+    }
+    if (retries == 0) {
+        printf("[TEST_MODE] Failed to send setpoint command (mailbox busy)\n");
+        return false;
+    }
+
     active_test_mode = mode_id;
 
     // Single consolidated printf to avoid blocking NSP handler
-    // (USB-CDC printf can block if buffer fills, causing NSP timeouts)
     printf("[TEST_MODE] %s: %.1f %s\n", desc->name, desc->setpoint,
            desc->mode == CONTROL_MODE_CURRENT ? "A" :
            desc->mode == CONTROL_MODE_SPEED ? "RPM" :
@@ -160,11 +189,11 @@ bool test_mode_activate(wheel_state_t* state, test_mode_id_t mode_id) {
 }
 
 void test_mode_deactivate(wheel_state_t* state) {
-    if (!state) return;
+    (void)state;  // State pointer not used - commands go through mailbox
 
-    // Return to safe idle state
-    wheel_model_set_mode(state, CONTROL_MODE_CURRENT);
-    wheel_model_set_current(state, 0.0f);
+    // Return to safe idle state via inter-core command mailbox
+    core_sync_send_command(CMD_SET_MODE, (float)CONTROL_MODE_CURRENT, 0.0f);
+    core_sync_send_command(CMD_SET_CURRENT, 0.0f, 0.0f);
 
     // Single printf to avoid blocking NSP handler
     if (active_test_mode != TEST_MODE_NONE) {
