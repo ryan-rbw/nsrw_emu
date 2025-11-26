@@ -19,18 +19,22 @@ static const test_mode_desc_t test_mode_table[TEST_MODE_COUNT] = {
     [TEST_MODE_NONE] = {
         .id = TEST_MODE_NONE,
         .name = "NONE",
-        .description = "No test mode active (idle, 0 current)",
+        .description = "No test mode active (idle)",
         .mode = CONTROL_MODE_CURRENT,
         .setpoint = 0.0f,
         .duration_s = 0.0f,
         .expect_fault = false
     },
 
-    // === Nominal Speed Operations ===
+    // =========================================================================
+    // NOMINAL SPEED OPERATIONS
+    // These use SPEED mode with PI controller - stable, closed-loop control
+    // The controller automatically limits current to achieve target RPM
+    // =========================================================================
     [TEST_MODE_SPEED_1000RPM] = {
         .id = TEST_MODE_SPEED_1000RPM,
         .name = "SPEED_1000",
-        .description = "Low speed - attitude fine control",
+        .description = "Low speed - fine attitude control",
         .mode = CONTROL_MODE_SPEED,
         .setpoint = 1000.0f,  // RPM
         .duration_s = 5.0f,
@@ -39,7 +43,7 @@ static const test_mode_desc_t test_mode_table[TEST_MODE_COUNT] = {
     [TEST_MODE_SPEED_2000RPM] = {
         .id = TEST_MODE_SPEED_2000RPM,
         .name = "SPEED_2000",
-        .description = "Medium speed - typical ADCS operation",
+        .description = "Medium speed - typical ADCS ops",
         .mode = CONTROL_MODE_SPEED,
         .setpoint = 2000.0f,  // RPM
         .duration_s = 6.0f,
@@ -64,11 +68,14 @@ static const test_mode_desc_t test_mode_table[TEST_MODE_COUNT] = {
         .expect_fault = false
     },
 
-    // === Limit Testing ===
+    // =========================================================================
+    // LIMIT TESTING
+    // Approach or exceed protection thresholds
+    // =========================================================================
     [TEST_MODE_SPEED_5000RPM] = {
         .id = TEST_MODE_SPEED_5000RPM,
         .name = "SPEED_5000",
-        .description = "Soft overspeed limit (triggers warning)",
+        .description = "Soft overspeed (triggers warning)",
         .mode = CONTROL_MODE_SPEED,
         .setpoint = 5000.0f,  // RPM (at soft limit)
         .duration_s = 12.0f,
@@ -77,83 +84,89 @@ static const test_mode_desc_t test_mode_table[TEST_MODE_COUNT] = {
     [TEST_MODE_OVERSPEED_FAULT] = {
         .id = TEST_MODE_OVERSPEED_FAULT,
         .name = "OVERSPEED",
-        .description = "Hard overspeed fault (6500 RPM, trips LCL)",
+        .description = "Hard overspeed fault (trips LCL)",
         .mode = CONTROL_MODE_SPEED,
         .setpoint = 6500.0f,  // RPM (exceeds 6000 RPM hard limit)
         .duration_s = 15.0f,
         .expect_fault = true  // Will trip overspeed fault + LCL
     },
 
-    // === Current/Torque Operations ===
+    // =========================================================================
+    // TORQUE OPERATIONS (Use TORQUE mode - more predictable than raw current)
+    // Torque mode converts mN·m to current internally: i = τ / k_t
+    // Max torque @ 6A ≈ 320 mN·m, but normal ops use much less
+    // =========================================================================
     [TEST_MODE_CURRENT_0_5A] = {
         .id = TEST_MODE_CURRENT_0_5A,
-        .name = "CURR_0.5A",
-        .description = "Low current - minimal torque (~27 mN·m)",
-        .mode = CONTROL_MODE_CURRENT,
-        .setpoint = 0.5f,  // A (produces ~27 mN·m via k_t)
-        .duration_s = 3.0f,
+        .name = "TORQ_27mNm",
+        .description = "Low torque - fine pointing",
+        .mode = CONTROL_MODE_TORQUE,
+        .setpoint = 27.0f,  // mN·m (equivalent to ~0.5A)
+        .duration_s = 0.0f,  // Continuous until deactivated
         .expect_fault = false
     },
     [TEST_MODE_CURRENT_1A] = {
         .id = TEST_MODE_CURRENT_1A,
-        .name = "CURR_1.0A",
-        .description = "Moderate current - typical operation (~53 mN·m)",
-        .mode = CONTROL_MODE_CURRENT,
-        .setpoint = 1.0f,  // A (produces ~53 mN·m via k_t)
-        .duration_s = 5.0f,
+        .name = "TORQ_53mNm",
+        .description = "Medium torque - typical slew",
+        .mode = CONTROL_MODE_TORQUE,
+        .setpoint = 53.0f,  // mN·m (equivalent to ~1A)
+        .duration_s = 0.0f,
         .expect_fault = false
     },
     [TEST_MODE_CURRENT_2A] = {
         .id = TEST_MODE_CURRENT_2A,
-        .name = "CURR_2.0A",
-        .description = "High current - aggressive maneuver (~107 mN·m)",
-        .mode = CONTROL_MODE_CURRENT,
-        .setpoint = 2.0f,  // A (produces ~107 mN·m via k_t)
-        .duration_s = 5.0f,
+        .name = "TORQ_107mNm",
+        .description = "High torque - fast maneuver",
+        .mode = CONTROL_MODE_TORQUE,
+        .setpoint = 107.0f,  // mN·m (equivalent to ~2A)
+        .duration_s = 0.0f,
         .expect_fault = false
     },
     [TEST_MODE_TORQUE_10MNM] = {
         .id = TEST_MODE_TORQUE_10MNM,
         .name = "TORQ_10mNm",
-        .description = "Fine torque control - precision pointing",
+        .description = "Precision torque - micro-pointing",
         .mode = CONTROL_MODE_TORQUE,
         .setpoint = 10.0f,  // mN·m
-        .duration_s = 0.0f,  // Continuous until deactivated
+        .duration_s = 0.0f,
         .expect_fault = false
     },
     [TEST_MODE_TORQUE_50MNM] = {
         .id = TEST_MODE_TORQUE_50MNM,
         .name = "TORQ_50mNm",
-        .description = "Medium torque - momentum building",
+        .description = "Moderate torque - momentum build",
         .mode = CONTROL_MODE_TORQUE,
         .setpoint = 50.0f,  // mN·m
-        .duration_s = 0.0f,  // Continuous until deactivated
+        .duration_s = 0.0f,
         .expect_fault = false
     },
 
-    // === Special Tests ===
+    // =========================================================================
+    // SPECIAL TESTS
+    // =========================================================================
     [TEST_MODE_ZERO_CROSS] = {
         .id = TEST_MODE_ZERO_CROSS,
         .name = "ZERO_CROSS",
-        .description = "Coast to zero - friction/loss characterization",
+        .description = "Coast to zero - friction test",
         .mode = CONTROL_MODE_SPEED,
-        .setpoint = 0.0f,  // RPM (will coast down from current speed)
-        .duration_s = 30.0f,  // Long duration to observe coast-down
+        .setpoint = 0.0f,  // RPM (actively drives to zero)
+        .duration_s = 30.0f,
         .expect_fault = false
     },
     [TEST_MODE_POWER_LIMIT] = {
         .id = TEST_MODE_POWER_LIMIT,
         .name = "PWR_LIMIT",
-        .description = "Power limit test - accelerate until 100W cap",
-        .mode = CONTROL_MODE_CURRENT,
-        .setpoint = 3.0f,  // A (high current to hit power limit quickly)
+        .description = "Speed to power limit (100W cap)",
+        .mode = CONTROL_MODE_SPEED,
+        .setpoint = 5500.0f,  // RPM (high speed to hit power limit during accel)
         .duration_s = 10.0f,
         .expect_fault = false  // Should hit power limit, not fault
     },
     [TEST_MODE_REVERSE] = {
         .id = TEST_MODE_REVERSE,
         .name = "REVERSE",
-        .description = "Negative direction - reverse rotation test",
+        .description = "Reverse rotation test",
         .mode = CONTROL_MODE_SPEED,
         .setpoint = -2000.0f,  // RPM (negative = reverse)
         .duration_s = 8.0f,

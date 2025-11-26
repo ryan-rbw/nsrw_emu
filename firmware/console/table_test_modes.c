@@ -110,12 +110,55 @@ bool table_test_modes_deactivate(void) {
 }
 
 /**
- * @brief List all available test modes
+ * @brief List all available test modes with categories
  */
 void table_test_modes_list(void) {
-    char buf[512];
-    test_mode_list_all(buf, sizeof(buf));
-    printf("%s", buf);
+    printf("\n");
+    printf("+-----+-------------+--------------------------------------+\n");
+    printf("| ID  | Name        | Description                          |\n");
+    printf("+-----+-------------+--------------------------------------+\n");
+
+    // Nominal Speed Operations (1-4)
+    printf("| " "\033[1m" "SPEED OPERATIONS (closed-loop, stable)" "\033[0m" "           |\n");
+    for (int i = 1; i <= 4; i++) {
+        const test_mode_desc_t* desc = test_mode_get_descriptor((test_mode_id_t)i);
+        if (desc) {
+            printf("| %2d  | %-11s | %-36s |\n", i, desc->name, desc->description);
+        }
+    }
+
+    // Limit Testing (5-6)
+    printf("+-----+-------------+--------------------------------------+\n");
+    printf("| " "\033[1m" "LIMIT TESTING" "\033[0m" "                                        |\n");
+    for (int i = 5; i <= 6; i++) {
+        const test_mode_desc_t* desc = test_mode_get_descriptor((test_mode_id_t)i);
+        if (desc) {
+            printf("| %2d  | %-11s | %-36s |\n", i, desc->name, desc->description);
+        }
+    }
+
+    // Torque Operations (7-11)
+    printf("+-----+-------------+--------------------------------------+\n");
+    printf("| " "\033[1m" "TORQUE OPERATIONS (open-loop, speed-limited)" "\033[0m" "      |\n");
+    for (int i = 7; i <= 11; i++) {
+        const test_mode_desc_t* desc = test_mode_get_descriptor((test_mode_id_t)i);
+        if (desc) {
+            printf("| %2d  | %-11s | %-36s |\n", i, desc->name, desc->description);
+        }
+    }
+
+    // Special Tests (12-14)
+    printf("+-----+-------------+--------------------------------------+\n");
+    printf("| " "\033[1m" "SPECIAL TESTS" "\033[0m" "                                        |\n");
+    for (int i = 12; i <= 14; i++) {
+        const test_mode_desc_t* desc = test_mode_get_descriptor((test_mode_id_t)i);
+        if (desc) {
+            printf("| %2d  | %-11s | %-36s |\n", i, desc->name, desc->description);
+        }
+    }
+
+    printf("+-----+-------------+--------------------------------------+\n");
+    printf("\nUsage: test <ID> to activate, test 0 to deactivate\n\n");
 }
 
 /**

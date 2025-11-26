@@ -110,44 +110,20 @@ void tui_shutdown(void) {
 // Main Update Loop
 // ============================================================================
 
-// Track if we need full clear (expand/collapse changed layout)
-static bool g_needs_full_clear = true;
-
-// Forward declaration for internal render function
-static void tui_render_browse_content(void);
-
 void tui_update(bool force_redraw) {
     if (!force_redraw && !g_tui_state.needs_refresh) {
         return;  // Nothing to do
     }
 
-    // Determine if we need full clear (layout changed) or just value update
-    // Full clear on: navigation changes, expand/collapse, first draw
-    // Value update on: periodic refresh (force_redraw without needs_refresh)
-    bool do_full_clear = g_needs_full_clear || g_tui_state.needs_refresh;
-
     // Render current mode
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
-            if (do_full_clear) {
-                tui_clear_screen();
-                g_needs_full_clear = false;
-            } else {
-                // Just home cursor - existing content will be overwritten
-                printf(ANSI_CURSOR_HOME);
-            }
-            tui_render_browse_content();
+            tui_render_browse();
             break;
 
         case TUI_MODE_EDIT:
             // In edit mode, re-render browse view with input shown in status bar
-            if (do_full_clear) {
-                tui_clear_screen();
-                g_needs_full_clear = false;
-            } else {
-                printf(ANSI_CURSOR_HOME);
-            }
-            tui_render_browse_content();
+            tui_render_browse();
             break;
     }
 
@@ -328,7 +304,6 @@ static bool tui_handle_browse_input(int key) {
             g_tui_state.selected_field_idx = 0;
             g_tui_state.status_msg[0] = '\0';  // Clear status message
             g_tui_state.needs_refresh = true;
-            g_needs_full_clear = true;  // Layout changed
             return true;
 
         case KEY_ARROW_LEFT:
@@ -337,7 +312,6 @@ static bool tui_handle_browse_input(int key) {
             g_tui_state.selected_field_idx = 0;
             g_tui_state.status_msg[0] = '\0';  // Clear status message
             g_tui_state.needs_refresh = true;
-            g_needs_full_clear = true;  // Layout changed
             return true;
 
         case '\r':
@@ -573,8 +547,10 @@ static bool tui_handle_edit_input(int key) {
 // Forward declaration
 static void format_field_display_name(const char* var_name, char* buf, size_t buflen);
 
-// Internal function that renders browse content (without clear/home)
-static void tui_render_browse_content(void) {
+void tui_render_browse(void) {
+    // Clear screen and home cursor
+    tui_clear_screen();
+
     // Header
     tui_print_header();
 
@@ -672,12 +648,6 @@ static void tui_render_browse_content(void) {
 
     // Status bar
     tui_print_status_bar(g_tui_state.status_msg);
-}
-
-// Public wrapper - clears screen and renders content
-void tui_render_browse(void) {
-    tui_clear_screen();
-    tui_render_browse_content();
 }
 
 void tui_render_field_edit(const void* table, const void* field) {

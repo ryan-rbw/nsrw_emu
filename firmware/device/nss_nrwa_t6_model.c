@@ -265,9 +265,14 @@ static void control_mode_speed(wheel_state_t* state) {
 }
 
 /**
- * @brief TORQUE mode: ΔH feed-forward with current limiting
+ * @brief TORQUE mode: ΔH feed-forward with speed limiting
  *
  * τ_cmd → i_out = τ_cmd / k_t
+ *
+ * Includes automatic torque reduction as speed approaches limits:
+ * - Above soft overspeed (5000 RPM): reduce torque linearly
+ * - At hard overspeed (6000 RPM): zero torque in accelerating direction
+ * - If torque would accelerate past limit, clamp to zero
  */
 static void control_mode_torque(wheel_state_t* state) {
     // Convert torque command from mN·m to N·m
@@ -275,6 +280,25 @@ static void control_mode_torque(wheel_state_t* state) {
 
     // Calculate required current: i = τ / k_t
     float current_required = torque_nm / MOTOR_KT_NM_PER_A;
+
+    // Speed limiting: reduce torque as we approach overspeed
+    float speed_rpm = fabsf(wheel_model_get_speed_rpm(state));
+    float soft_limit = state->overspeed_soft_rpm;
+    float hard_limit = state->overspeed_fault_rpm;
+
+    // Check if torque would accelerate us toward the limit
+    bool accelerating_positive = (state->omega_rad_s >= 0 && current_required > 0);
+    bool accelerating_negative = (state->omega_rad_s < 0 && current_required < 0);
+    bool accelerating_toward_limit = accelerating_positive || accelerating_negative;
+
+    if (accelerating_toward_limit && speed_rpm > soft_limit) {
+        // Linear reduction from soft limit to hard limit
+        float reduction = (speed_rpm - soft_limit) / (hard_limit - soft_limit);
+        reduction = clamp(reduction, 0.0f, 1.0f);
+
+        // At hard limit, torque drops to zero
+        current_required *= (1.0f - reduction);
+    }
 
     // Output current
     state->current_out_a = current_required;
