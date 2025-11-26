@@ -15,6 +15,7 @@
 #include "table_test_modes.h"
 #include "nss_nrwa_t6_model.h"
 #include "nss_nrwa_t6_protection.h"
+#include "nss_nrwa_t6_test_modes.h"
 #include "util/core_sync.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,20 +110,44 @@ void tui_shutdown(void) {
 // Main Update Loop
 // ============================================================================
 
+// Track if we need full clear (expand/collapse changed layout)
+static bool g_needs_full_clear = true;
+
+// Forward declaration for internal render function
+static void tui_render_browse_content(void);
+
 void tui_update(bool force_redraw) {
     if (!force_redraw && !g_tui_state.needs_refresh) {
         return;  // Nothing to do
     }
 
+    // Determine if we need full clear (layout changed) or just value update
+    // Full clear on: navigation changes, expand/collapse, first draw
+    // Value update on: periodic refresh (force_redraw without needs_refresh)
+    bool do_full_clear = g_needs_full_clear || g_tui_state.needs_refresh;
+
     // Render current mode
     switch (g_tui_state.mode) {
         case TUI_MODE_BROWSE:
-            tui_render_browse();
+            if (do_full_clear) {
+                tui_clear_screen();
+                g_needs_full_clear = false;
+            } else {
+                // Just home cursor - existing content will be overwritten
+                printf(ANSI_CURSOR_HOME);
+            }
+            tui_render_browse_content();
             break;
 
         case TUI_MODE_EDIT:
             // In edit mode, re-render browse view with input shown in status bar
-            tui_render_browse();
+            if (do_full_clear) {
+                tui_clear_screen();
+                g_needs_full_clear = false;
+            } else {
+                printf(ANSI_CURSOR_HOME);
+            }
+            tui_render_browse_content();
             break;
     }
 
@@ -153,7 +178,8 @@ static void tui_show_test_mode_menu(void) {
 
     // Menu options
     printf(ANSI_BOLD "Options:" ANSI_RESET "\n");
-    printf("  Press 1-7 to activate test mode\n");
+    printf("  Press 1-9 to activate test mode 1-9\n");
+    printf("  Press A-E to activate test mode 10-14\n");
     printf("  Press 0 to deactivate current test mode\n");
     printf("  Press C to clear all faults\n");
     printf("  Press Q to return to main menu\n");
@@ -170,12 +196,21 @@ static void tui_show_test_mode_menu(void) {
 
     printf("\n\n");
 
-    if (key >= '1' && key <= '7') {
+    // Parse selection (1-9 direct, A-E for 10-14)
+    int selection = -1;
+    if (key >= '1' && key <= '9') {
+        selection = key - '0';  // 1-9
+    } else if (key >= 'a' && key <= 'e') {
+        selection = 10 + (key - 'a');  // a=10, b=11, c=12, d=13, e=14
+    } else if (key >= 'A' && key <= 'E') {
+        selection = 10 + (key - 'A');  // A=10, B=11, C=12, D=13, E=14
+    }
+
+    if (selection >= 1 && selection < TEST_MODE_COUNT) {
         // Activate selected mode
-        int selection = key - '0';
         if (table_test_modes_activate(selection)) {
-            printf(ANSI_FG_GREEN "Test mode activated!" ANSI_RESET "\n");
-            printf("Check Table 11 (Test Modes) and Table 5 (Dynamics) for status.\n");
+            printf(ANSI_FG_GREEN "Test mode %d activated!" ANSI_RESET "\n", selection);
+            printf("Check Table 11 (Test Modes) and Table 10 (Core1 Physics) for status.\n");
         } else {
             printf(ANSI_FG_RED "Failed to activate test mode." ANSI_RESET "\n");
         }
@@ -293,6 +328,7 @@ static bool tui_handle_browse_input(int key) {
             g_tui_state.selected_field_idx = 0;
             g_tui_state.status_msg[0] = '\0';  // Clear status message
             g_tui_state.needs_refresh = true;
+            g_needs_full_clear = true;  // Layout changed
             return true;
 
         case KEY_ARROW_LEFT:
@@ -301,6 +337,7 @@ static bool tui_handle_browse_input(int key) {
             g_tui_state.selected_field_idx = 0;
             g_tui_state.status_msg[0] = '\0';  // Clear status message
             g_tui_state.needs_refresh = true;
+            g_needs_full_clear = true;  // Layout changed
             return true;
 
         case '\r':
@@ -536,9 +573,8 @@ static bool tui_handle_edit_input(int key) {
 // Forward declaration
 static void format_field_display_name(const char* var_name, char* buf, size_t buflen);
 
-void tui_render_browse(void) {
-    tui_clear_screen();
-
+// Internal function that renders browse content (without clear/home)
+static void tui_render_browse_content(void) {
     // Header
     tui_print_header();
 
@@ -636,6 +672,12 @@ void tui_render_browse(void) {
 
     // Status bar
     tui_print_status_bar(g_tui_state.status_msg);
+}
+
+// Public wrapper - clears screen and renders content
+void tui_render_browse(void) {
+    tui_clear_screen();
+    tui_render_browse_content();
 }
 
 void tui_render_field_edit(const void* table, const void* field) {

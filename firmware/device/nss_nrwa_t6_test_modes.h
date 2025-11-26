@@ -20,16 +20,44 @@
 
 /**
  * @brief Test mode identifiers
+ *
+ * Test modes are organized into realistic operating scenarios for the NRWA-T6:
+ * - Nominal operations (speeds within safe operating range)
+ * - Limit testing (approach soft/hard limits)
+ * - Fault conditions (intentionally trigger protection limits)
+ *
+ * NRWA-T6 Specifications (for reference):
+ * - Max speed: 6000 RPM (hard fault), 5000 RPM (soft warning)
+ * - Max current: ~6A (soft limit)
+ * - Max power: 100W
+ * - Inertia: 5.35e-5 kg·m²
+ * - Torque constant: 0.0534 N·m/A (max ~320 mN·m at 6A)
  */
 typedef enum {
     TEST_MODE_NONE = 0,           // No test mode active (normal operation)
-    TEST_MODE_SPEED_5000RPM,      // Speed mode at 5000 RPM (soft limit test)
-    TEST_MODE_SPEED_3000RPM,      // Speed mode at 3000 RPM (nominal operation)
-    TEST_MODE_CURRENT_2A,         // Current mode at 2.0 A (moderate torque)
-    TEST_MODE_TORQUE_50MNM,       // Torque mode at 50 mN·m (momentum building)
-    TEST_MODE_OVERSPEED_FAULT,    // Speed mode at 6500 RPM (trigger fault)
-    TEST_MODE_POWER_LIMIT,        // High speed + high current (power limit test)
-    TEST_MODE_ZERO_CROSS,         // Oscillate through zero speed (friction test)
+
+    // === Nominal Speed Operations ===
+    TEST_MODE_SPEED_1000RPM,      // Low speed - attitude fine control
+    TEST_MODE_SPEED_2000RPM,      // Medium speed - typical ADCS operation
+    TEST_MODE_SPEED_3000RPM,      // Nominal cruise - momentum storage
+    TEST_MODE_SPEED_4000RPM,      // High speed - large slew maneuver
+
+    // === Limit Testing ===
+    TEST_MODE_SPEED_5000RPM,      // Soft overspeed limit (triggers warning)
+    TEST_MODE_OVERSPEED_FAULT,    // Hard overspeed limit (triggers fault + LCL)
+
+    // === Current/Torque Operations ===
+    TEST_MODE_CURRENT_0_5A,       // Low current - minimal torque
+    TEST_MODE_CURRENT_1A,         // Moderate current - typical operation
+    TEST_MODE_CURRENT_2A,         // High current - aggressive maneuver
+    TEST_MODE_TORQUE_10MNM,       // Fine torque control
+    TEST_MODE_TORQUE_50MNM,       // Medium torque - momentum building
+
+    // === Special Tests ===
+    TEST_MODE_ZERO_CROSS,         // Coast to zero - friction/loss test
+    TEST_MODE_POWER_LIMIT,        // High speed acceleration - power limit test
+    TEST_MODE_REVERSE,            // Negative direction test
+
     TEST_MODE_COUNT               // Total number of test modes
 } test_mode_id_t;
 
