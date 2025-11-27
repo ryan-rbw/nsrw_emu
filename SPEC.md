@@ -306,3 +306,189 @@ Representative addresses with UQ formats:
 - Example JSON scenarios
 - Host tester and logs
 - UF2 binary
+
+---
+
+## 15. Protocol Reference (Byte-Level)
+
+This section provides the authoritative reference for all message structures transmitted and received by the NRWA-T6 emulator. All structures are verified against the ICD specification.
+
+### 15.1 Endianness and Encoding
+
+| Data Type | Endianness | Notes |
+|-----------|------------|-------|
+| **NSP CRC** | Little-endian (LSB-first) | `[CRC_L, CRC_H]` per ICD Table 11-1 |
+| **Telemetry Data** | Big-endian (MSB-first) | Network byte order for all multi-byte fields |
+| **Register Values** | Little-endian (LSB-first) | PEEK/POKE uses little-endian |
+
+**Example**:
+- Value `0x12345678` in telemetry → bytes: `12 34 56 78` (big-endian)
+- Value `0x12345678` in register → bytes: `78 56 34 12` (little-endian)
+- CRC value `0xA53F` → bytes: `3F A5` (little-endian)
+
+### 15.2 NSP Packet Structure
+
+**Format** (after SLIP decoding):
+```
+[Dest | Src | Ctrl | Data... | CRC_L | CRC_H]
+```
+
+**There is NO Length field** - packet boundaries determined by SLIP framing.
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 1 | Dest | Destination address (0x00-0x07 or 0xFF for broadcast) |
+| 1 | 1 | Src | Source address (0x00-0x07) |
+| 2 | 1 | Ctrl | Control byte (see below) |
+| 3 | N | Data | Command payload (0-255 bytes) |
+| 3+N | 1 | CRC_L | CRC low byte (LSB-first) |
+| 4+N | 1 | CRC_H | CRC high byte |
+
+**Control Byte Format**:
+```
+Bit 7     Bit 6  Bit 5  Bits 4-0
+[Poll] | [B] | [A] | [Command]
+```
+
+- **Poll** (bit 7): 1 = reply expected, 0 = no reply
+- **B** (bit 6): ACK bit (preserved in replies)
+- **A** (bit 5): ACK bit (1 = ACK, 0 = NACK in replies)
+- **Command** (bits 4-0): 5-bit command code (0x00-0x1F)
+
+### 15.3 NSP Command Details
+
+#### 0x00: PING
+- **Request**: `Dest | Src | Ctrl | CRC_L | CRC_H` (no data payload)
+- **Reply**: `Dest | Src | 0x20 | CRC_L | CRC_H` (ACK, no data)
+
+#### 0x02: PEEK (Read Registers)
+- **Request**: `Dest | Src | Ctrl | Addr_H | Addr_L | Count | CRC`
+- **Reply**: `Dest | Src | Ctrl | Data[Count×4] | CRC` (little-endian 32-bit values)
+
+#### 0x03: POKE (Write Registers)
+- **Request**: `Dest | Src | Ctrl | Addr_H | Addr_L | Count | Data[Count×4] | CRC`
+- **Reply**: ACK/NACK (no data)
+
+#### 0x07: APP-TELEM (Application Telemetry)
+- **Request**: `Dest | Src | Ctrl | Block_ID | CRC`
+- **Reply**: `Dest | Src | Ctrl | Telemetry_Data | CRC` (big-endian)
+
+#### 0x08: APP-CMD (Application Command)
+Subcommands:
+| Subcmd | Name | Payload |
+|--------|------|---------|
+| 0x00 | SET-MODE | `[subcmd, mode]` - mode: 0-3 |
+| 0x01 | SET-SPEED | `[subcmd, speed_b3..b0]` - UQ14.18 RPM |
+| 0x02 | SET-CURRENT | `[subcmd, current_b3..b0]` - UQ18.14 mA |
+| 0x03 | SET-TORQUE | `[subcmd, torque_b3..b0]` - UQ18.14 mN·m |
+| 0x04 | SET-PWM | `[subcmd, duty_b1, duty_b0]` - UQ8.8 % |
+| 0x05 | SET-DIRECTION | `[subcmd, direction]` - 0=POS, 1=NEG |
+
+**All APP-CMD multi-byte values are BIG-ENDIAN**
+
+#### 0x09: CLEAR-FAULT
+- **Request**: `Dest | Src | Ctrl | Mask[4] | CRC` (big-endian mask)
+- **Reply**: ACK (no data)
+
+#### 0x0A: CONFIG-PROT (Configure Protection)
+- **Request**: `Dest | Src | Ctrl | Param_ID | Value[4] | CRC` (big-endian value)
+- **Reply**: ACK (no data)
+
+#### 0x0B: TRIP-LCL
+- **Request**: `Dest | Src | Ctrl | CRC` (no payload)
+- **Reply**: ACK (no data)
+
+### 15.4 Telemetry Blocks
+
+**ALL TELEMETRY DATA IS BIG-ENDIAN (MSB-first)**
+
+#### Block 0x00: STANDARD (38 bytes)
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | Status Register | uint32 |
+| 4 | 4 | Fault Status | uint32 |
+| 8 | 4 | Fault Latch | uint32 |
+| 12 | 4 | Warning Status | uint32 |
+| 16 | 1 | Control Mode | uint8 |
+| 17 | 1 | Direction | uint8 |
+| 18 | 4 | Speed | UQ14.18 RPM |
+| 22 | 4 | Current | UQ18.14 mA |
+| 26 | 4 | Torque | UQ18.14 mN·m |
+| 30 | 4 | Power | UQ18.14 mW |
+| 34 | 4 | Momentum | UQ18.14 µN·m·s |
+
+#### Block 0x01: TEMPERATURES (6 bytes)
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 2 | Motor Temp | UQ8.8 °C |
+| 2 | 2 | Driver Temp | UQ8.8 °C |
+| 4 | 2 | Board Temp | UQ8.8 °C |
+
+#### Block 0x02: VOLTAGES (12 bytes)
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | Bus Voltage | UQ16.16 V |
+| 4 | 4 | Phase A Voltage | UQ16.16 V |
+| 8 | 4 | Phase B Voltage | UQ16.16 V |
+
+#### Block 0x03: CURRENTS (12 bytes)
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | Phase A Current | UQ18.14 mA |
+| 4 | 4 | Phase B Current | UQ18.14 mA |
+| 8 | 4 | Bus Current | UQ18.14 mA |
+
+#### Block 0x04: DIAGNOSTICS (18 bytes)
+| Offset | Size | Field | Type |
+|--------|------|-------|------|
+| 0 | 4 | Tick Count | uint32 |
+| 4 | 4 | Uptime | uint32 s |
+| 8 | 4 | Fault Count | uint32 |
+| 12 | 4 | Command Count | uint32 |
+| 16 | 2 | Max Jitter | uint16 µs |
+
+### 15.5 Register Map
+
+**ALL REGISTER VALUES ARE LITTLE-ENDIAN** (LSB-first when accessed via PEEK/POKE)
+
+| Range | Access | Description |
+|-------|--------|-------------|
+| 0x0000-0x00FF | RO | Device Information |
+| 0x0100-0x01FF | RW | Protection Configuration |
+| 0x0200-0x02FF | RW | Control Registers |
+| 0x0300-0x03FF | RO | Status Registers |
+| 0x0400-0x04FF | RW/RO | Fault & Diagnostics |
+
+Key registers:
+- `0x0000` DEVICE_ID: 0x4E525754 ("NRWT")
+- `0x0200` CONTROL_MODE: 0=CURRENT, 1=SPEED, 2=TORQUE, 3=PWM
+- `0x0204` SPEED_SETPOINT_RPM: UQ14.18
+- `0x0300` CURRENT_SPEED_RPM: UQ14.18 (read-only)
+- `0x0400` FAULT_STATUS: Active fault bitmask
+
+### 15.6 Fixed-Point Formats
+
+| Format | Bits | Range | Resolution | Usage |
+|--------|------|-------|------------|-------|
+| UQ14.18 | 32 | 0-16383 | 0.0000038 | Speed (RPM) |
+| UQ16.16 | 32 | 0-65535 | 0.000015 | Voltage, Percentage |
+| UQ18.14 | 32 | 0-262143 | 0.000061 | Torque, Current, Power |
+| UQ8.8 | 16 | 0-255 | 0.0039 | Temperature |
+
+**Encoding**: `value_int = (float_value * 2^frac_bits)`
+**Decoding**: `float_value = (value_int / 2^frac_bits)`
+
+### 15.7 Quick Reference
+
+| Context | Endianness |
+|---------|------------|
+| NSP CRC | Little-endian |
+| Telemetry fields | Big-endian |
+| APP-CMD payloads | Big-endian |
+| Register values (PEEK/POKE) | Little-endian |
+
+**Common Mistakes**:
+1. Mixing endianness (telemetry is big-endian, registers are little-endian)
+2. Missing Length field in NSP (use SLIP framing instead)
+3. Wrong CRC byte order (always LSB-first)
+4. Wrong fixed-point format for field type

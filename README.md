@@ -197,23 +197,44 @@ Supported NSP commands (see [SPEC.md](SPEC.md) for details):
 
 ## Testing
 
-### Host Tester (Python)
+### Built-In Tests
 
-*Coming soon - Phase 10*
+The emulator includes a comprehensive built-in test suite that runs at startup:
+
+```bash
+# Connect to console and observe test results
+./connect.sh
+
+# Tests include:
+# - CRC-CCITT validation (7 test vectors)
+# - SLIP encode/decode round-trip
+# - RS-485 loopback
+# - NSP protocol parsing
+# - Ring buffer stress test (1M operations)
+# - Fixed-point math accuracy
+# - Physics model validation
+# - Protection system verification
+```
+
+### Test Modes
+
+14 built-in test modes for validating reaction wheel behavior:
+
+```bash
+# In TUI, navigate to Table 11 (Test Modes)
+# Or use test_mode command: test_mode <1-14>
+
+# Speed operations (1-4): Closed-loop stable control
+# Limit testing (5-6): Protection system validation
+# Torque operations (7-11): Open-loop with speed limiting
+# Special tests (12-14): Direction, fault, zero-cross
+```
+
+### Host Tester (Python)
 
 ```bash
 cd tools
 python host_tester.py --port /dev/ttyUSB0 --baud 460800
-```
-
-### Unit Tests
-
-*Coming soon - Phase 4-7*
-
-```bash
-cd build
-cmake -DBUILD_TESTS=ON ..
-make test
 ```
 
 ## Project Structure
@@ -242,7 +263,7 @@ nsrw_emu/
 
 ## Development Status
 
-**Current Phase**: Phase 8 Complete ✅ - Console & TUI (100%)
+**Current Phase**: Phase 10 Complete ✅ - Full Emulator (100%)
 
 - [x] Phase 1: Project Foundation
 - [x] Phase 2: Platform Layer
@@ -251,18 +272,16 @@ nsrw_emu/
 - [x] Phase 5: Device Model & Physics
 - [x] Phase 6: Device Commands & Telemetry
 - [x] Phase 7: Protection System
-- [x] Phase 8: Console & TUI (Complete)
-  - [x] 8.1: TUI Core & Test System Refactor
-  - [x] 8.2: Table Catalog (7 base tables)
-  - [x] 8.3: Command Palette
-- [ ] Phase 9: Fault Injection System
-- [ ] Phase 10: Main Application & Dual-Core
+- [x] Phase 8: Console & TUI
+- [x] Phase 9: Fault Injection System
+- [x] Phase 10: Main Application & Dual-Core
 
 **Metrics**:
-- **Lines of Code**: ~11,300 (optimized from 12,900)
-- **Checkpoints Complete**: 18/~19 (95%)
-- **Unit Tests**: 46 tests (all passing, cached at boot)
-- **Flash Usage**: 151 KB / 256 KB (59%)
+- **Lines of Code**: ~12,500+
+- **Phases Complete**: 10/10 (100%)
+- **Unit Tests**: 46+ tests (all passing, cached at boot)
+- **Flash Usage**: 115 KB / 256 KB (45%)
+- **RAM Usage**: 17.7 KB / 264 KB (69%)
 
 See [PROGRESS.md](PROGRESS.md) for detailed status and [IMP.md](IMP.md) for implementation plan.
 
@@ -330,6 +349,6 @@ This project follows the implementation plan in [IMP.md](IMP.md). Each phase has
 
 ---
 
-**Version**: 0.1.0
-**Last Updated**: 2025-11-08
-**Status**: Phase 8 Complete ✅ - Console & TUI with table catalog (optimized: 151 KB / 59% flash)
+**Version**: 1.0.0
+**Last Updated**: 2025-11-26
+**Status**: Phase 10 Complete ✅ - Full dual-core emulator (115 KB / 45% flash)

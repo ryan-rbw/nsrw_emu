@@ -492,9 +492,9 @@ To restart and see the full boot sequence:
 
 ## Expected Output
 
-### Checkpoint 3.1 (CRC-CCITT Test)
+### Full Emulator (Phase 10)
 
-When running with `CHECKPOINT_3_1` enabled (current configuration), you should see:
+When running the complete firmware, you should see:
 
 ```
 ╔════════════════════════════════════════════════════════════╗
@@ -502,54 +502,33 @@ When running with `CHECKPOINT_3_1` enabled (current configuration), you should s
 ║     NewSpace Systems NRWA-T6 Compatible                   ║
 ╚════════════════════════════════════════════════════════════╝
 
-Firmware Version : v0.1.0-8fe6124
-Build Date       : Nov  5 2025 HH:MM:SS
-Target Platform  : RP2040 (Pico)
+Firmware Version : v1.0.0-eb4e459
+Build Date       : Nov 26 2025 HH:MM:SS
+Target Platform  : RP2040 Dual-Core @ 125MHz
 Board ID         : E6614103E73F2B34
-
-Status           : Initializing...
 
 [Core0] Initializing hardware...
 [Core0] Device address: 0x00 (from ADDR pins)
+[Core1] Physics engine starting at 100 Hz...
 
 ╔════════════════════════════════════════════════════════════╗
-║  CHECKPOINT 3.1: CRC-CCITT TEST MODE                      ║
+║  Running Built-In Test Suite                              ║
 ╚════════════════════════════════════════════════════════════╝
 
-=== Checkpoint 3.1: CRC-CCITT Test Vectors ===
+[CRC-CCITT] 7 tests... ✓ ALL PASSED
+[SLIP] 6 tests... ✓ ALL PASSED
+[RS-485] 4 tests... ✓ ALL PASSED
+[NSP Protocol] 8 tests... ✓ ALL PASSED
+[Ring Buffer] 6 tests... ✓ ALL PASSED
+[Fixed-Point] 7 tests... ✓ ALL PASSED
+[Physics Model] 7 tests... ✓ ALL PASSED
+[Protection System] 8 tests... ✓ ALL PASSED
 
-Test 1: {0x01, 0x02, 0x03}
-  Calculated CRC: 0x7E70
-  Test 1: ✓ PASS
+✓✓✓ ALL TESTS PASSED (46/46) ✓✓✓
 
-Test 2: Empty buffer
-  Calculated CRC: 0xFFFF
-  Test 2 (empty): ✓ PASS
+Press any key to enter interactive TUI...
 
-Test 3: {0x00}
-  Calculated CRC: 0x1D0F
-  Test 3: ✓ PASS
-
-Test 4: {0xFF, 0xFF, 0xFF, 0xFF}
-  Calculated CRC: 0x1D00
-  Test 4: ✓ PASS
-
-Test 5: ASCII "123456789"
-  Calculated CRC: 0x29B1
-  Test 5 (ASCII): ✓ PASS
-
-Test 6: Incremental calculation {0x01, 0x02, 0x03}
-  Calculated CRC: 0x7E70
-  Test 6 (incremental): ✓ PASS
-
-Test 7: NSP PING packet
-  Calculated CRC: 0x543D
-  Test 7 (NSP PING): ✓ PASS
-
-✓✓✓ ALL CRC TESTS PASSED ✓✓✓
-
-Test complete. Halting in checkpoint mode.
-Heartbeat LED will continue blinking.
+[Entering TUI mode - arrow keys to navigate, Q to quit]
 ```
 
 ### Physical Indicators
@@ -912,13 +891,13 @@ picotool uf2 convert firmware/nrwa_t6_emulator.elf firmware/nrwa_t6_emulator.uf2
 
 ## Next Steps
 
-After successfully building and testing Checkpoint 3.1:
+After successfully building and flashing:
 
-1. **Verify all tests pass** - All 7 CRC tests should show ✓ PASS
-2. **Check LED is blinking** - Confirms hardware initialization worked
-3. **Proceed to Checkpoint 3.2** - SLIP codec implementation
-4. **See [IMP.md](IMP.md)** for implementation roadmap
-5. **See [PROGRESS.md](PROGRESS.md)** for current status
+1. **Connect to console** - Use `./connect.sh` or `screen /dev/ttyACM0 115200`
+2. **Verify built-in tests pass** - 46+ tests should show ✓ PASS at startup
+3. **Check LED is blinking** - Confirms hardware initialization and dual-core operation
+4. **Explore the TUI** - Press any key after tests to enter interactive mode
+5. **Test RS-485** - Connect transceiver and send NSP commands
 
 ---
 
@@ -929,12 +908,12 @@ After successfully building and testing Checkpoint 3.1:
 - **Getting Started with Pico**: https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf
 - **This Project's Documentation**:
   - [README.md](README.md) - Project overview
-  - [SPEC.md](SPEC.md) - Full specification
-  - [IMP.md](IMP.md) - Implementation plan
-  - [PROGRESS.md](PROGRESS.md) - Current status
+  - [SPEC.md](SPEC.md) - Full specification with protocol reference
+  - [IMP.md](IMP.md) - Implementation plan (10 phases)
+  - [PROGRESS.md](PROGRESS.md) - Development progress tracker
 
 ---
 
-**Last Updated**: 2025-11-05
-**Current Checkpoint**: 3.1 (CRC-CCITT) ✅ Complete
-**Next Checkpoint**: 3.2 (SLIP Codec)
+**Last Updated**: 2025-11-26
+**Project Status**: Phase 10 Complete ✅ - Full dual-core emulator
+**Build Output**: ~115 KB flash (45% of 256 KB)
