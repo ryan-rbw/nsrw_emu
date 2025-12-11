@@ -2021,17 +2021,22 @@ void test_nsp_commands(void) {
     }
 
     // Test 7: TRIP-LCL
+    // NOTE: We test TRIP-LCL by calling wheel_model_trip_lcl() directly on the
+    // local test state, NOT by using cmd_trip_lcl() which sends a command via
+    // the inter-core mailbox to Core1. Using cmd_trip_lcl() would corrupt the
+    // global g_wheel_state that Core1 is using, causing LCL to appear tripped
+    // after boot tests complete.
     {
         TEST_SECTION("Test 7: TRIP-LCL");
-        printf("Testing TRIP-LCL [0x0B] command...\n");
+        printf("Testing TRIP-LCL [0x0B] functionality...\n");
 
-        uint8_t payload[] = {};
-        cmd_trip_lcl(payload, 0, &result);
+        // Test the LCL trip function directly on local state
+        wheel_model_trip_lcl(&state);
 
         bool lcl_tripped = wheel_model_is_lcl_tripped(&state);
-        bool passed = (result.status == CMD_ACK) && lcl_tripped;
-        printf("  Response: %s\n", (result.status == CMD_ACK) ? "ACK" : "NACK");
+        bool passed = lcl_tripped && (state.fault_latch == 0xFFFFFFFF);
         printf("  LCL tripped: %s\n", lcl_tripped ? "YES" : "NO");
+        printf("  fault_latch: 0x%08X (expected 0xFFFFFFFF)\n", state.fault_latch);
 
         TEST_RESULT("TRIP-LCL trips LCL", passed);
         if (!passed) all_passed = false;

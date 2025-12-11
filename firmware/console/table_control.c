@@ -224,3 +224,16 @@ const char* table_control_get_direction_string(uint32_t direction) {
     }
     return "INVALID";
 }
+
+uint32_t table_control_get_fault_latch(void) {
+    // Return fault_latch from the telemetry snapshot (safe from Core0)
+    // If snapshot isn't valid yet, return 0 (no faults)
+    if (!g_control_snapshot_valid) {
+        return 0;
+    }
+    return g_control_snapshot.fault_latch;
+}
+
+bool table_control_snapshot_valid(void) {
+    return g_control_snapshot_valid;
+}

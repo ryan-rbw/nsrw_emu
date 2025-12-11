@@ -3,7 +3,7 @@
 **Project**: Reaction Wheel Emulator for NewSpace Systems NRWA-T6
 **Platform**: Raspberry Pi Pico (RP2040)
 **Started**: 2025-11-05
-**Last Updated**: 2025-11-17
+**Last Updated**: 2025-12-11
 
 ---
 
@@ -2035,6 +2035,62 @@ Added user-friendly fault clearing to test mode menu:
 3. **Realistic Operation**: Proper power-on and mode transitions
 4. **User-Friendly**: Clear faults with single keypress
 5. **Production-Ready**: Matches ICD specifications
+
+---
+
+### Bug Fixes: Physics Model & Boot Initialization (2025-12-11)
+
+**Status**: Complete
+
+#### Issues Fixed
+
+**1. LCL Tripped at Startup with fault_latch = 0xFFFFFFFF**
+
+**Root Cause**: The `test_nsp_commands()` boot test was calling `cmd_trip_lcl()` which sends `CMD_TRIP_LCL` via the inter-core mailbox to Core1. Core1 executed `wheel_model_trip_lcl(&g_wheel_state)` on the **global** state, even though the test intended to use a **local** test state.
+
+**Fix**: Modified [firmware/test_mode.c:2023-2046](firmware/test_mode.c#L2023-L2046) to call `wheel_model_trip_lcl(&state)` directly on the local test state instead of using the inter-core mailbox.
+
+**2. Wheel Shows ~1 RPM When Should Be Stationary (0 RPM)**
+
+**Root Cause**: Numerical oscillation around zero caused by Coulomb friction being stronger than wheel momentum at low speeds. The friction torque caused velocity to overshoot zero and reverse direction repeatedly.
+
+**Fix**: Modified [firmware/device/nss_nrwa_t6_model.c:97-178](firmware/device/nss_nrwa_t6_model.c#L97-L178) with:
+- **Stiction check**: If wheel speed < 5 RPM AND current < 10 mA, immediately clamp to zero
+- **Zero-crossing detection**: When velocity would change sign, only allow if motor torque exceeds static friction
+
+**3. Data Race Prevention in TUI**
+
+**Root Cause**: Core0 was directly reading `g_wheel_state` fields while Core1 was modifying them.
+
+**Fix**: Replaced direct state access with telemetry snapshot reads in:
+- [firmware/console/tui.c](firmware/console/tui.c) - Fault clearing uses `core_sync_read_telemetry()`
+- [firmware/console/table_test_modes.c](firmware/console/table_test_modes.c) - Status display uses telemetry
+
+**4. Commands Module Initialization**
+
+**Root Cause**: `commands_init(&g_wheel_state)` was never called from startup sequence.
+
+**Fix**: Added call in [firmware/app_main.c:354](firmware/app_main.c#L354) after Core1 is ready.
+
+#### Files Modified
+
+| File | Changes |
+|------|---------|
+| [firmware/test_mode.c](firmware/test_mode.c) | Fixed TRIP-LCL test to use local state directly |
+| [firmware/device/nss_nrwa_t6_model.c](firmware/device/nss_nrwa_t6_model.c) | Added stiction check and zero-crossing detection |
+| [firmware/console/tui.c](firmware/console/tui.c) | Replaced direct g_wheel_state access with telemetry |
+| [firmware/console/table_test_modes.c](firmware/console/table_test_modes.c) | Replaced direct reads with telemetry snapshot |
+| [firmware/app_main.c](firmware/app_main.c) | Added commands_init() call, telemetry sync wait |
+
+#### Verification
+
+After fixes:
+- Wheel shows 0 RPM when idle (not ~1 RPM oscillation)
+- LCL Tripped = FALSE at boot
+- fault_latch = 0x00000000 at boot
+- Banner shows "Fault: -" (no faults)
+- Test modes work correctly
+- NSP commands function properly
 
 ---
 

@@ -66,12 +66,55 @@
 
 // Control Mode
 #define REG_CONTROL_MODE            0x0200  // uint8_t: Control mode enum
-  typedef enum {
-      CONTROL_MODE_CURRENT = 0,  // Direct current control
-      CONTROL_MODE_SPEED   = 1,  // Speed (RPM) control with PI controller
-      CONTROL_MODE_TORQUE  = 2,  // Torque (momentum change) control
-      CONTROL_MODE_PWM     = 3   // PWM duty cycle backup mode
-  } control_mode_t;
+
+// ICD Control Mode Bitmask Values (Table 12-25)
+// Internal: We use ordinal indices (0-3) for array indexing in physics model
+// ICD Wire: Uses bitmask values (0b0001, 0b0010, 0b0100, 0b1000)
+typedef enum {
+    CONTROL_MODE_CURRENT = 0,  // Direct current control (ICD: 0b0001)
+    CONTROL_MODE_SPEED   = 1,  // Speed (RPM) control with PI controller (ICD: 0b0010)
+    CONTROL_MODE_TORQUE  = 2,  // Torque (momentum change) control (ICD: 0b0100)
+    CONTROL_MODE_PWM     = 3   // PWM duty cycle backup mode (ICD: 0b1000)
+} control_mode_t;
+
+// ICD Control Mode Wire Values (bitmask encoding per Table 12-25)
+#define ICD_MODE_IDLE       0x00  // 0b0000 - High-Z, no active control
+#define ICD_MODE_CURRENT    0x01  // 0b0001 - Current control
+#define ICD_MODE_SPEED      0x02  // 0b0010 - Speed control
+#define ICD_MODE_TORQUE     0x04  // 0b0100 - Torque control
+#define ICD_MODE_PWM        0x08  // 0b1000 - PWM control
+
+/**
+ * @brief Convert ICD bitmask mode to internal index
+ *
+ * @param icd_mode ICD bitmask value (0x00-0x0F)
+ * @return Internal mode index (0-3), or 0xFF for IDLE/invalid
+ */
+static inline uint8_t icd_mode_to_index(uint8_t icd_mode) {
+    switch (icd_mode & 0x0F) {
+        case ICD_MODE_CURRENT: return CONTROL_MODE_CURRENT;  // 0x01 -> 0
+        case ICD_MODE_SPEED:   return CONTROL_MODE_SPEED;    // 0x02 -> 1
+        case ICD_MODE_TORQUE:  return CONTROL_MODE_TORQUE;   // 0x04 -> 2
+        case ICD_MODE_PWM:     return CONTROL_MODE_PWM;      // 0x08 -> 3
+        default:               return 0xFF;                   // IDLE or invalid
+    }
+}
+
+/**
+ * @brief Convert internal mode index to ICD bitmask
+ *
+ * @param mode Internal mode index (control_mode_t)
+ * @return ICD bitmask value
+ */
+static inline uint8_t index_to_icd_mode(uint8_t mode) {
+    static const uint8_t mode_map[] = {
+        ICD_MODE_CURRENT,  // 0 -> 0x01
+        ICD_MODE_SPEED,    // 1 -> 0x02
+        ICD_MODE_TORQUE,   // 2 -> 0x04
+        ICD_MODE_PWM       // 3 -> 0x08
+    };
+    return (mode < 4) ? mode_map[mode] : ICD_MODE_IDLE;
+}
 
 // Setpoints
 #define REG_SPEED_SETPOINT_RPM      0x0204  // UQ14.18: Speed setpoint (RPM)

@@ -50,21 +50,36 @@ static float calculate_motor_torque(float current_a) {
  *
  * τ_loss = a·ω + b·sign(ω) + c·i²
  *
+ * The Coulomb friction term uses a deadband around zero to prevent
+ * numerical oscillation when the wheel is at rest.
+ *
  * @param omega_rad_s Angular velocity in rad/s
  * @param current_a Motor current in A
  * @return Loss torque in mN·m
  */
 static float calculate_loss_torque(float omega_rad_s, float current_a) {
-    // Viscous loss: a·ω
-    float loss_viscous = LOSS_VISCOUS_A * omega_rad_s;
+    // Viscous loss: a·|ω| (proportional to speed magnitude)
+    float loss_viscous = LOSS_VISCOUS_A * fabsf(omega_rad_s);
 
-    // Coulomb friction: b·sign(ω)
-    float loss_coulomb = LOSS_COULOMB_B * sign(omega_rad_s);
+    // Coulomb friction: b·scale (smooth ramp from 0 to full friction)
+    // Instead of a hard cutoff at low speeds, use a smooth ramp to avoid
+    // the wheel "floating" when Coulomb friction disappears at zero.
+    // This ensures friction is always present when moving, even slightly.
+    const float OMEGA_FRICTION_THRESHOLD = 0.01f;  // rad/s (~0.1 RPM)
+    float omega_abs = fabsf(omega_rad_s);
+    float friction_scale;
+    if (omega_abs >= OMEGA_FRICTION_THRESHOLD) {
+        friction_scale = 1.0f;  // Full friction above threshold
+    } else {
+        // Linear ramp from 0 to full friction
+        friction_scale = omega_abs / OMEGA_FRICTION_THRESHOLD;
+    }
+    float loss_coulomb = LOSS_COULOMB_B * friction_scale;
 
-    // Copper loss: c·i²
+    // Copper loss: c·i² (resistive losses in motor windings)
     float loss_copper = LOSS_COPPER_C * current_a * current_a;
 
-    // Total loss (N·m)
+    // Total loss MAGNITUDE (N·m) - direction applied in update_dynamics()
     float loss_nm = loss_viscous + loss_coulomb + loss_copper;
 
     return loss_nm * 1000.0f;  // Convert to mN·m
@@ -80,25 +95,75 @@ static float calculate_loss_torque(float omega_rad_s, float current_a) {
  * @param state Pointer to wheel state structure
  */
 static void update_dynamics(wheel_state_t* state) {
+    // ========================================================================
+    // Stiction Check: If wheel is nearly stopped with no motor torque, hold at zero
+    // ========================================================================
+    // This prevents numerical oscillation around zero caused by Coulomb friction
+    // being stronger than the wheel's momentum at low speeds.
+    const float STICTION_OMEGA_THRESHOLD = 0.5f;  // rad/s (~5 RPM)
+    const float STICTION_CURRENT_THRESHOLD = 0.01f;  // A (10 mA)
+
+    if (fabsf(state->omega_rad_s) < STICTION_OMEGA_THRESHOLD &&
+        fabsf(state->current_out_a) < STICTION_CURRENT_THRESHOLD) {
+        // No motor torque applied and wheel is nearly stopped - hold at zero
+        state->omega_rad_s = 0.0f;
+        state->momentum_nms = 0.0f;
+        state->torque_out_mnm = 0.0f;
+        state->torque_loss_mnm = 0.0f;
+        state->alpha_rad_s2 = 0.0f;
+        state->power_w = 0.0f;
+        return;  // Skip full dynamics calculation
+    }
+
+    // ========================================================================
+    // Normal Dynamics Update
+    // ========================================================================
+
     // Calculate motor torque from output current
     float torque_motor_mnm = calculate_motor_torque(state->current_out_a);
 
-    // Calculate loss torque
+    // Calculate loss torque (opposes motion)
     float torque_loss_mnm = calculate_loss_torque(state->omega_rad_s, state->current_out_a);
 
-    // Apply direction (negative direction inverts torque)
+    // Apply direction (negative direction inverts motor torque)
     float direction_sign = (state->direction == DIRECTION_POSITIVE) ? 1.0f : -1.0f;
     torque_motor_mnm *= direction_sign;
 
-    // Net torque (mN·m)
-    float torque_net_mnm = torque_motor_mnm - torque_loss_mnm;
+    // Loss torque always opposes motion direction
+    float loss_sign = sign(state->omega_rad_s);
+
+    // Net torque (mN·m) - loss always opposes current velocity direction
+    float torque_net_mnm = torque_motor_mnm - (loss_sign * torque_loss_mnm);
     float torque_net_nm = torque_net_mnm / 1000.0f;  // Convert to N·m
 
     // Angular acceleration: α = τ / I
     float alpha_rad_s2 = torque_net_nm / WHEEL_INERTIA_KGM2;
 
-    // Integrate velocity: ω_new = ω_old + α·Δt
-    state->omega_rad_s += alpha_rad_s2 * MODEL_DT_S;
+    // Calculate new velocity
+    float omega_old = state->omega_rad_s;
+    float omega_new = omega_old + alpha_rad_s2 * MODEL_DT_S;
+
+    // ========================================================================
+    // Zero-Crossing Detection
+    // ========================================================================
+    // If the wheel was decelerating and would cross zero, clamp to zero.
+    // This prevents oscillation when friction would cause overshoot.
+    // A wheel that was spinning and then stopped should stay stopped unless
+    // motor torque is applied.
+    if ((omega_old > 0.0f && omega_new < 0.0f) ||
+        (omega_old < 0.0f && omega_new > 0.0f)) {
+        // Velocity would change sign - wheel is stopping
+        // Only allow if motor torque is strong enough to reverse direction
+        float motor_torque_nm = fabsf(torque_motor_mnm) / 1000.0f;
+        float static_friction_nm = LOSS_COULOMB_B;  // Static friction threshold
+
+        if (motor_torque_nm < static_friction_nm) {
+            // Motor torque not strong enough to overcome static friction
+            omega_new = 0.0f;
+        }
+    }
+
+    state->omega_rad_s = omega_new;
 
     // Update momentum: H = I·ω
     state->momentum_nms = WHEEL_INERTIA_KGM2 * state->omega_rad_s;
@@ -173,10 +238,21 @@ static void check_protections(wheel_state_t* state) {
 
     // Update fault status
     state->fault_status = new_faults;
+
+    // Track NEW faults for diagnostic counters (only count newly latched faults)
+    uint32_t newly_latched = new_faults & ~state->fault_latch;
+
     state->fault_latch |= new_faults;  // Latch new faults
 
     // Update warning status
     state->warning_status = new_warnings;
+
+    // Increment diagnostic counters for newly detected faults (ICD Table 12-19)
+    if (newly_latched != 0) {
+        state->drive_fault_count++;  // General fault counter
+    }
+    // Note: drive_overtemp_count would be incremented by temperature monitoring
+    // (not implemented - thermal model is future work)
 
     // Hard faults trip the LCL (requires hardware reset to recover)
     // Per ICD: Overvoltage and hard overspeed trip LCL
@@ -418,6 +494,14 @@ void wheel_model_init(wheel_state_t* state) {
     state->tick_count = 0;
     state->uptime_seconds = 0;
 
+    // ========================================================================
+    // Diagnostic Counters (per ICD Table 12-19)
+    // ========================================================================
+    state->revolution_count = 0;      // Revolution count
+    state->hall_invalid_count = 0;    // Hall sensor errors (simulated: always 0)
+    state->drive_fault_count = 0;     // Drive fault count
+    state->drive_overtemp_count = 0;  // Overtemperature count
+
     printf("[WHEEL] Power-on initialization complete\n");
     printf("  Mode: CURRENT (High-Z)\n");
     printf("  All faults cleared: 0x%08X\n", state->fault_latch);
@@ -465,6 +549,18 @@ void wheel_model_tick(wheel_state_t* state) {
     if ((state->tick_count % 100) == 0) {
         // Every 100 ticks = 1 second
         state->uptime_seconds++;
+    }
+
+    // Update revolution count (ICD Table 12-19)
+    // revolutions = ω * Δt / (2π)
+    // We integrate revolutions each tick (100 Hz)
+    // rev_per_tick = |ω| * 0.01 / (2π) = |ω| * 0.001591549
+    static float revolution_accumulator = 0.0f;
+    revolution_accumulator += fabsf(state->omega_rad_s) * MODEL_DT_S / (2.0f * 3.14159265f);
+    if (revolution_accumulator >= 1.0f) {
+        uint32_t whole_revs = (uint32_t)revolution_accumulator;
+        state->revolution_count += whole_revs;
+        revolution_accumulator -= (float)whole_revs;
     }
 }
 

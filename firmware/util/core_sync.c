@@ -74,6 +74,34 @@ bool core_sync_send_command(command_type_t type, float param1, float param2) {
     return true;
 }
 
+bool core_sync_send_command_blocking(command_type_t type, float param1, float param2, uint32_t timeout_us) {
+    if (command_spinlock == NULL) {
+        return false;  // Not initialized
+    }
+
+    // Use default timeout if 0 specified
+    if (timeout_us == 0) {
+        timeout_us = CORE_SYNC_CMD_TIMEOUT_US;
+    }
+
+    uint64_t start_time = time_us_64();
+    uint64_t deadline = start_time + timeout_us;
+
+    while (time_us_64() < deadline) {
+        // Try to send command
+        if (core_sync_send_command(type, param1, param2)) {
+            return true;  // Success
+        }
+
+        // Mailbox full - wait a bit for Core1 to consume it
+        // Core1 runs at 100Hz (10ms period), so 1ms retry interval is reasonable
+        sleep_us(CORE_SYNC_CMD_RETRY_US);
+    }
+
+    // Timeout expired
+    return false;
+}
+
 bool core_sync_read_command(command_mailbox_t* cmd) {
     if (command_spinlock == NULL || cmd == NULL) {
         return false;

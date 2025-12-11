@@ -9,10 +9,13 @@
 #include "console_format.h"
 #include "nss_nrwa_t6_test_modes.h"
 #include "nss_nrwa_t6_model.h"
+#include "util/core_sync.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 // External reference to wheel state (shared across tables)
+// NOTE: Direct reads should be avoided - use telemetry snapshot for Core0 safety
 extern wheel_state_t g_wheel_state;
 
 // ============================================================================
@@ -203,16 +206,29 @@ void table_test_modes_print_status(void) {
             printf("%.2f\n", desc->setpoint);
     }
 
-    // Settling status
-    bool settled = test_mode_is_settled(&g_wheel_state);
+    // Use telemetry snapshot for Core0-safe reads
+    telemetry_snapshot_t snapshot;
+    bool have_snapshot = core_sync_read_telemetry(&snapshot);
+
+    // Settling status (needs snapshot for speed comparison)
+    bool settled = false;
+    if (have_snapshot) {
+        // Check if actual speed is close to target
+        float speed_error = fabsf(snapshot.speed_rpm - desc->setpoint);
+        settled = (desc->mode == CONTROL_MODE_SPEED && speed_error < 50.0f);
+    }
     printf("Settled: %s\n", settled ? "YES" : "NO");
 
-    // Current actual values
+    // Current actual values - use telemetry snapshot for thread safety
     printf("\nActual Values:\n");
-    printf("  Speed: %.1f RPM\n", wheel_model_get_speed_rpm(&g_wheel_state));
-    printf("  Current: %.3f A\n", g_wheel_state.current_out_a);
-    printf("  Torque: %.1f mN·m\n", g_wheel_state.torque_out_mnm);
-    printf("  Power: %.2f W\n", g_wheel_state.power_w);
+    if (have_snapshot) {
+        printf("  Speed: %.1f RPM\n", snapshot.speed_rpm);
+        printf("  Current: %.3f A\n", snapshot.current_a);
+        printf("  Torque: %.1f mN·m\n", snapshot.torque_mnm);
+        printf("  Power: %.2f W\n", snapshot.power_w);
+    } else {
+        printf("  (telemetry not available)\n");
+    }
 
     if (desc->expect_fault) {
         printf("\n⚠️  This test mode expects to trigger a fault\n");

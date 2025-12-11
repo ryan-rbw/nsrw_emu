@@ -195,20 +195,32 @@ static void tui_show_test_mode_menu(void) {
         table_test_modes_deactivate();
         printf(ANSI_FG_GREEN "Test mode deactivated." ANSI_RESET "\n");
     } else if (key == 'c' || key == 'C') {
-        // Clear all faults
-        if (wheel_model_is_lcl_tripped(&g_wheel_state)) {
-            printf(ANSI_FG_RED "Cannot clear faults: LCL has tripped!" ANSI_RESET "\n");
-            printf("LCL-tripping faults require hardware RESET to clear.\n");
-            printf("(In real hardware, this requires cycling power or RESET pin)\n");
-        } else {
-            uint32_t old_faults = g_wheel_state.fault_latch;
-            wheel_model_clear_faults(&g_wheel_state, 0xFFFFFFFF);
-            if (old_faults != 0) {
-                printf(ANSI_FG_GREEN "All faults cleared!" ANSI_RESET "\n");
-                printf("Previous faults: 0x%08X\n", old_faults);
+        // Clear all faults - use telemetry snapshot to avoid data race with Core1
+        telemetry_snapshot_t snapshot;
+        if (core_sync_read_telemetry(&snapshot)) {
+            if (snapshot.lcl_tripped) {
+                printf(ANSI_FG_RED "Cannot clear faults: LCL has tripped!" ANSI_RESET "\n");
+                printf("LCL-tripping faults require hardware RESET to clear.\n");
+                printf("(In real hardware, this requires cycling power or RESET pin)\n");
             } else {
-                printf(ANSI_FG_YELLOW "No faults to clear." ANSI_RESET "\n");
+                uint32_t old_faults = snapshot.fault_latch;
+                // Send CLEAR_FAULT command to Core1 via command mailbox
+                uint32_t clear_mask = 0xFFFFFFFF;
+                float mask_as_float;
+                memcpy(&mask_as_float, &clear_mask, sizeof(float));
+                if (core_sync_send_command_blocking(CMD_CLEAR_FAULT, mask_as_float, 0.0f, 0)) {
+                    if (old_faults != 0) {
+                        printf(ANSI_FG_GREEN "All faults cleared!" ANSI_RESET "\n");
+                        printf("Previous faults: 0x%08lX\n", (unsigned long)old_faults);
+                    } else {
+                        printf(ANSI_FG_YELLOW "No faults to clear." ANSI_RESET "\n");
+                    }
+                } else {
+                    printf(ANSI_FG_RED "Failed to send clear fault command to Core1" ANSI_RESET "\n");
+                }
             }
+        } else {
+            printf(ANSI_FG_RED "Cannot read telemetry - Core1 not ready" ANSI_RESET "\n");
         }
     } else if (key == 'q' || key == 'Q' || key == 27) {
         // Return to menu (no message)
@@ -714,8 +726,8 @@ void tui_print_status_banner(void) {
     const char* status = (speed_rpm == 0) ? "IDLE" : "ACTIVE";
     const char* status_color = (speed_rpm == 0) ? ANSI_FG_GREEN : ANSI_FG_CYAN;
 
-    // Get fault status (check latched faults - these persist until cleared)
-    uint32_t faults = g_wheel_state.fault_latch;
+    // Get fault status from telemetry snapshot (not g_wheel_state which may have stale/garbage data)
+    uint32_t faults = table_control_get_fault_latch();
     const char* fault_color = (faults == 0) ? ANSI_DIM : ANSI_FG_RED;
 
     // Format fault string (human-readable names)

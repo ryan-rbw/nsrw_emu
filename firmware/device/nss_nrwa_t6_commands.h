@@ -43,6 +43,7 @@
 typedef enum {
     CMD_ACK = 0,        // Command successful
     CMD_NACK = 1,       // Command failed (invalid parameter, out of range, etc.)
+    CMD_NO_REPLY = 2,   // No reply should be sent (e.g., TRIP-LCL per ICD)
 } cmd_response_t;
 
 /**

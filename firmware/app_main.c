@@ -55,6 +55,9 @@
 // NSP packet handler (Core0)
 #include "nsp_handler.h"
 
+// NSP commands (for commands_init)
+#include "nss_nrwa_t6_commands.h"
+
 // Uncomment to run Phase 9 tests at boot (normally user-triggered from TUI)
 // #define RUN_PHASE9_TESTS
 
@@ -124,12 +127,9 @@ void core1_main(void) {
     printf("[Core1] Starting physics engine...\n");
 
     // Initialize wheel model with default state
+    // Note: wheel_model_init() internally calls protection_init()
     wheel_model_init(&g_wheel_state);
-    printf("[Core1] Wheel model initialized\n");
-
-    // Initialize protection system
-    protection_init(&g_wheel_state);
-    printf("[Core1] Protection system initialized\n");
+    printf("[Core1] Wheel model initialized (includes protection system)\n");
 
     // Initialize test mode framework
     test_mode_init();
@@ -171,7 +171,30 @@ void core1_main(void) {
             // Apply command to wheel model
             switch (cmd.type) {
                 case CMD_SET_MODE:
-                    wheel_model_set_mode(&g_wheel_state, (control_mode_t)cmd.param1);
+                    // param1 = mode index, param2 = setpoint (optional, from APP-CMD)
+                    {
+                        control_mode_t new_mode = (control_mode_t)cmd.param1;
+                        wheel_model_set_mode(&g_wheel_state, new_mode);
+
+                        // If param2 is non-zero, apply the setpoint for the new mode
+                        // This enables atomic mode+setpoint changes from APPLICATION-COMMAND
+                        if (cmd.param2 != 0.0f) {
+                            switch (new_mode) {
+                                case CONTROL_MODE_CURRENT:
+                                    wheel_model_set_current(&g_wheel_state, cmd.param2);
+                                    break;
+                                case CONTROL_MODE_SPEED:
+                                    wheel_model_set_speed(&g_wheel_state, cmd.param2);
+                                    break;
+                                case CONTROL_MODE_TORQUE:
+                                    wheel_model_set_torque(&g_wheel_state, cmd.param2);
+                                    break;
+                                case CONTROL_MODE_PWM:
+                                    wheel_model_set_pwm(&g_wheel_state, cmd.param2);
+                                    break;
+                            }
+                        }
+                    }
                     break;
 
                 case CMD_SET_SPEED:
@@ -191,15 +214,35 @@ void core1_main(void) {
                     break;
 
                 case CMD_CLEAR_FAULT:
-                    // Clear latched faults (param1 = fault mask)
-                    g_wheel_state.fault_latch &= ~((uint32_t)cmd.param1);
-                    g_wheel_state.fault_status &= ~((uint32_t)cmd.param1);
+                    // Clear latched faults (param1 = fault mask encoded as float)
+                    {
+                        uint32_t fault_mask;
+                        memcpy(&fault_mask, &cmd.param1, sizeof(uint32_t));
+                        g_wheel_state.fault_latch &= ~fault_mask;
+                        g_wheel_state.fault_status &= ~fault_mask;
+                    }
                     break;
 
                 case CMD_RESET:
                     // Soft reset: reinitialize wheel model
                     wheel_model_init(&g_wheel_state);
                     protection_init(&g_wheel_state);
+                    break;
+
+                case CMD_TRIP_LCL:
+                    // Test LCL trip (ICD TRIP-LCL command)
+                    // This simulates the hardware LCL tripping
+                    wheel_model_trip_lcl(&g_wheel_state);
+                    break;
+
+                case CMD_CONFIG_PROTECTION:
+                    // Configure protection enable mask (ICD CONFIGURE-PROTECTION)
+                    // param1 contains the enable mask encoded as float
+                    {
+                        uint32_t enable_mask;
+                        memcpy(&enable_mask, &cmd.param1, sizeof(uint32_t));
+                        g_wheel_state.protection_enable = enable_mask;
+                    }
                     break;
 
                 default:
@@ -305,6 +348,26 @@ int main(void) {
         sleep_ms(10);
     }
     printf("[Core0] Core1 ready\n");
+
+    // Initialize commands module with wheel state pointer
+    // This MUST happen after Core1 has initialized g_wheel_state
+    commands_init(&g_wheel_state);
+    printf("[Core0] Commands module initialized\n");
+
+    // Wait for first telemetry snapshot from Core1
+    // This ensures TUI has valid data to display at startup
+    printf("[Core0] Waiting for first telemetry...\n");
+    telemetry_snapshot_t warmup;
+    uint64_t deadline = time_us_64() + 200000;  // 200ms timeout
+    while (!core_sync_read_telemetry(&warmup) && time_us_64() < deadline) {
+        sleep_ms(5);
+    }
+    if (time_us_64() >= deadline) {
+        printf("[Core0] WARNING: No telemetry received from Core1\n");
+    } else {
+        printf("[Core0] First telemetry received (tick=%lu, faults=0x%08lX)\n",
+               (unsigned long)warmup.tick_count, (unsigned long)warmup.fault_latch);
+    }
     printf("\n");
 
     // ========================================================================

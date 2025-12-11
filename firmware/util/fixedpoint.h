@@ -40,6 +40,25 @@ typedef uint32_t uq18_14_t;
 typedef uint16_t uq8_8_t;
 
 // ============================================================================
+// ICD-Required Signed Q-Formats (for telemetry per ICD N2-A2a-DD0021)
+// ============================================================================
+
+/** @brief Q24.8: 24 integer bits, 8 fractional bits (for speed measurement in RPM) */
+typedef uint32_t q24_8_t;
+
+/** @brief Q14.2: 14 integer bits, 2 fractional bits (for current target in mA) */
+typedef uint16_t q14_2_t;
+
+/** @brief Q20.12: 20 integer bits, 12 fractional bits (for current measurement in mA) */
+typedef uint32_t q20_12_t;
+
+/** @brief Q10.22: 10 integer bits, 22 fractional bits (for torque in mN-m) */
+typedef uint32_t q10_22_t;
+
+/** @brief Q16.16 (signed): 16 integer bits (signed), 16 fractional bits (for 30V current in A per ICD) */
+typedef int32_t q16_16_t;
+
+// ============================================================================
 // Format Constants
 // ============================================================================
 
@@ -70,6 +89,41 @@ typedef uint16_t uq8_8_t;
 #define UQ18_14_ONE         (1U << UQ18_14_FRAC_BITS)  // 16384
 #define UQ18_14_MAX         UINT32_MAX                  // Full 32-bit range
 #define UQ18_14_MAX_INT     ((1U << UQ18_14_INT_BITS) - 1)  // 262143
+
+// Q24.8 (Speed measurement per ICD)
+#define Q24_8_FRAC_BITS     8
+#define Q24_8_INT_BITS      24
+#define Q24_8_ONE           (1U << Q24_8_FRAC_BITS)    // 256
+#define Q24_8_MAX           UINT32_MAX                  // Full 32-bit range
+#define Q24_8_MAX_INT       ((1U << Q24_8_INT_BITS) - 1)  // 16777215
+
+// Q14.2 (Current target per ICD)
+#define Q14_2_FRAC_BITS     2
+#define Q14_2_INT_BITS      14
+#define Q14_2_ONE           (1U << Q14_2_FRAC_BITS)    // 4
+#define Q14_2_MAX           UINT16_MAX                  // Full 16-bit range
+#define Q14_2_MAX_INT       ((1U << Q14_2_INT_BITS) - 1)  // 16383
+
+// Q20.12 (Current measurement per ICD)
+#define Q20_12_FRAC_BITS    12
+#define Q20_12_INT_BITS     20
+#define Q20_12_ONE          (1U << Q20_12_FRAC_BITS)   // 4096
+#define Q20_12_MAX          UINT32_MAX                  // Full 32-bit range
+#define Q20_12_MAX_INT      ((1U << Q20_12_INT_BITS) - 1)  // 1048575
+
+// Q10.22 (Torque per ICD)
+#define Q10_22_FRAC_BITS    22
+#define Q10_22_INT_BITS     10
+#define Q10_22_ONE          (1U << Q10_22_FRAC_BITS)   // 4194304
+#define Q10_22_MAX          UINT32_MAX                  // Full 32-bit range
+#define Q10_22_MAX_INT      ((1U << Q10_22_INT_BITS) - 1)  // 1023
+
+// Q16.16 (Signed, for 30V supply current in A per ICD Table 12-18)
+#define Q16_16_FRAC_BITS    16
+#define Q16_16_INT_BITS     16
+#define Q16_16_ONE          (1 << Q16_16_FRAC_BITS)    // 65536
+#define Q16_16_MAX          INT32_MAX                   // Signed 32-bit max
+#define Q16_16_MIN          INT32_MIN                   // Signed 32-bit min
 
 // ============================================================================
 // Conversion Functions: Float ↔ Fixed-Point
@@ -177,6 +231,140 @@ static inline uq18_14_t float_to_uq18_14(float f) {
  */
 static inline float uq18_14_to_float(uq18_14_t x) {
     return (float)x / (float)UQ18_14_ONE;
+}
+
+// ============================================================================
+// ICD Q-Format Conversion Functions
+// ============================================================================
+
+/**
+ * @brief Convert float to Q24.8 (Speed measurement in RPM per ICD)
+ *
+ * @param f Float value (0.0 to 16777215.99609375)
+ * @return Fixed-point value, saturated to Q24_8_MAX
+ */
+static inline q24_8_t float_to_q24_8(float f) {
+    if (f <= 0.0f) {
+        return 0;
+    }
+    if (f >= (float)Q24_8_MAX_INT) {
+        return Q24_8_MAX;  // Saturate
+    }
+    return (q24_8_t)(f * (float)Q24_8_ONE + 0.5f);  // Round to nearest
+}
+
+/**
+ * @brief Convert Q24.8 to float
+ *
+ * @param x Fixed-point value
+ * @return Float value
+ */
+static inline float q24_8_to_float(q24_8_t x) {
+    return (float)x / (float)Q24_8_ONE;
+}
+
+/**
+ * @brief Convert float to Q14.2 (Current target in mA per ICD)
+ *
+ * @param f Float value (0.0 to 16383.75)
+ * @return Fixed-point value, saturated to Q14_2_MAX
+ */
+static inline q14_2_t float_to_q14_2(float f) {
+    if (f <= 0.0f) {
+        return 0;
+    }
+    if (f >= (float)Q14_2_MAX_INT) {
+        return Q14_2_MAX;  // Saturate
+    }
+    return (q14_2_t)(f * (float)Q14_2_ONE + 0.5f);  // Round to nearest
+}
+
+/**
+ * @brief Convert Q14.2 to float
+ *
+ * @param x Fixed-point value
+ * @return Float value
+ */
+static inline float q14_2_to_float(q14_2_t x) {
+    return (float)x / (float)Q14_2_ONE;
+}
+
+/**
+ * @brief Convert float to Q20.12 (Current measurement in mA per ICD)
+ *
+ * @param f Float value (0.0 to 1048575.999756)
+ * @return Fixed-point value, saturated to Q20_12_MAX
+ */
+static inline q20_12_t float_to_q20_12(float f) {
+    if (f <= 0.0f) {
+        return 0;
+    }
+    if (f >= (float)Q20_12_MAX_INT) {
+        return Q20_12_MAX;  // Saturate
+    }
+    return (q20_12_t)(f * (float)Q20_12_ONE + 0.5f);  // Round to nearest
+}
+
+/**
+ * @brief Convert Q20.12 to float
+ *
+ * @param x Fixed-point value
+ * @return Float value
+ */
+static inline float q20_12_to_float(q20_12_t x) {
+    return (float)x / (float)Q20_12_ONE;
+}
+
+/**
+ * @brief Convert float to Q10.22 (Torque in mN-m per ICD)
+ *
+ * @param f Float value (0.0 to 1023.999999)
+ * @return Fixed-point value, saturated to Q10_22_MAX
+ */
+static inline q10_22_t float_to_q10_22(float f) {
+    if (f <= 0.0f) {
+        return 0;
+    }
+    if (f >= (float)Q10_22_MAX_INT) {
+        return Q10_22_MAX;  // Saturate
+    }
+    return (q10_22_t)(f * (float)Q10_22_ONE + 0.5f);  // Round to nearest
+}
+
+/**
+ * @brief Convert Q10.22 to float
+ *
+ * @param x Fixed-point value
+ * @return Float value
+ */
+static inline float q10_22_to_float(q10_22_t x) {
+    return (float)x / (float)Q10_22_ONE;
+}
+
+/**
+ * @brief Convert float to Q16.16 (signed) (30V supply current in A per ICD Table 12-18)
+ *
+ * @param f Float value (-32768.0 to 32767.999985)
+ * @return Fixed-point value, saturated to Q16_16_MIN/MAX
+ */
+static inline q16_16_t float_to_q16_16(float f) {
+    if (f >= 32767.0f) {
+        return Q16_16_MAX;  // Saturate positive
+    }
+    if (f <= -32768.0f) {
+        return Q16_16_MIN;  // Saturate negative
+    }
+    return (q16_16_t)(f * (float)Q16_16_ONE + (f >= 0 ? 0.5f : -0.5f));  // Round to nearest
+}
+
+/**
+ * @brief Convert Q16.16 (signed) to float
+ *
+ * @param x Fixed-point value
+ * @return Float value
+ */
+static inline float q16_16_to_float(q16_16_t x) {
+    return (float)x / (float)Q16_16_ONE;
 }
 
 // ============================================================================

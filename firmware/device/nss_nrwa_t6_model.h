@@ -124,6 +124,12 @@ typedef struct {
     uint32_t tick_count;        // Total physics ticks
     uint32_t uptime_seconds;    // Total uptime
 
+    // Diagnostic counters (per ICD Table 12-19)
+    uint32_t revolution_count;      // Revolution count (integrated from speed)
+    uint32_t hall_invalid_count;    // Motor Hall sensor invalid transition count
+    uint32_t drive_fault_count;     // Drive-Fault count
+    uint32_t drive_overtemp_count;  // Drive-Overtemperature count
+
 } wheel_state_t;
 
 // ============================================================================

@@ -9,6 +9,7 @@
 #define TABLE_CONTROL_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /**
  * @brief Initialize Control Mode table and register with catalog
@@ -72,5 +73,17 @@ const char* table_control_get_mode_string(uint32_t mode);
  * @return Direction string or "INVALID"
  */
 const char* table_control_get_direction_string(uint32_t direction);
+
+/**
+ * @brief Get latched fault status from telemetry snapshot
+ * @return Fault latch bitmask (0 = no faults)
+ */
+uint32_t table_control_get_fault_latch(void);
+
+/**
+ * @brief Check if telemetry snapshot is valid (Core1 has published at least once)
+ * @return true if telemetry data is valid
+ */
+bool table_control_snapshot_valid(void);
 
 #endif // TABLE_CONTROL_H

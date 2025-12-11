@@ -65,70 +65,73 @@ uint16_t telemetry_build_block(uint8_t block_id, const wheel_state_t* state, uin
 uint16_t telemetry_build_standard(const wheel_state_t* state, uint8_t* buffer, uint16_t buffer_size);
 
 /**
- * @brief Build TEMPERATURES telemetry block
+ * @brief Build TEMPERATURES telemetry block (8 bytes per ICD Table 12-16)
  *
- * Block format (~6 bytes):
- *   [motor_temp:2]      // Motor temp (°C, UQ8.8)
- *   [driver_temp:2]     // Driver temp (°C, UQ8.8)
- *   [board_temp:2]      // Board temp (°C, UQ8.8)
+ * Block format (8 bytes):
+ *   [dcdc_temp:2]           // DC-DC Temperature (°C, 16-bit unsigned)
+ *   [enclosure_temp:2]      // Enclosure Temperature (°C, 16-bit unsigned)
+ *   [motor_driver_temp:2]   // Motor Driver Temperature (°C, 16-bit unsigned)
+ *   [motor_temp:2]          // Motor Temperature (°C, 16-bit unsigned)
  *
- * Note: Simulated temps for Phase 6 (fixed at 25°C)
+ * Note: Simulated temps (fixed at 25°C until thermal model implemented)
  *
  * @param state Pointer to wheel state
  * @param buffer Output buffer
  * @param buffer_size Buffer size
- * @return Block size in bytes
+ * @return Block size in bytes (8)
  */
 uint16_t telemetry_build_temperatures(const wheel_state_t* state, uint8_t* buffer, uint16_t buffer_size);
 
 /**
- * @brief Build VOLTAGES telemetry block
+ * @brief Build VOLTAGES telemetry block (24 bytes per ICD Table 12-17)
  *
- * Block format (~12 bytes):
- *   [bus_voltage:4]     // Bus voltage (V, UQ16.16)
- *   [phase_a_voltage:4] // Phase A voltage (V, UQ16.16)
- *   [phase_b_voltage:4] // Phase B voltage (V, UQ16.16)
- *
- * Note: Phase voltages derived from bus voltage
+ * Block format (24 bytes):
+ *   [voltage_1v5:4]     // 1.5V supply voltage (V, UQ16.16)
+ *   [voltage_3v3:4]     // 3.3V supply voltage (V, UQ16.16)
+ *   [voltage_5va:4]     // Analog 5V supply voltage (V, UQ16.16)
+ *   [voltage_12v:4]     // 12V supply voltage (V, UQ16.16)
+ *   [voltage_30v:4]     // 30V supply voltage (V, UQ16.16)
+ *   [voltage_2v5_ref:4] // 2.5V reference voltage (V, UQ16.16)
  *
  * @param state Pointer to wheel state
  * @param buffer Output buffer
  * @param buffer_size Buffer size
- * @return Block size in bytes
+ * @return Block size in bytes (24)
  */
 uint16_t telemetry_build_voltages(const wheel_state_t* state, uint8_t* buffer, uint16_t buffer_size);
 
 /**
- * @brief Build CURRENTS telemetry block
+ * @brief Build CURRENTS telemetry block (24 bytes per ICD Table 12-18)
  *
- * Block format (~12 bytes):
- *   [phase_a_current:4] // Phase A current (mA, UQ18.14)
- *   [phase_b_current:4] // Phase B current (mA, UQ18.14)
- *   [bus_current:4]     // Bus current (mA, UQ18.14)
- *
- * Note: Phase currents derived from motor current
+ * Block format (24 bytes):
+ *   [current_1v5:4]     // 1.5V supply current (mA, UQ16.16)
+ *   [current_3v3:4]     // 3.3V supply current (mA, UQ16.16)
+ *   [current_5va:4]     // Analog 5V supply current (mA, UQ16.16)
+ *   [current_5vd:4]     // Digital 5V supply current (mA, UQ16.16)
+ *   [current_12v:4]     // 12V supply current (mA, UQ16.16)
+ *   [current_30v:4]     // 30V supply current (A, Q16.16 signed)
  *
  * @param state Pointer to wheel state
  * @param buffer Output buffer
  * @param buffer_size Buffer size
- * @return Block size in bytes
+ * @return Block size in bytes (24)
  */
 uint16_t telemetry_build_currents(const wheel_state_t* state, uint8_t* buffer, uint16_t buffer_size);
 
 /**
- * @brief Build DIAGNOSTICS telemetry block
+ * @brief Build DIAGNOSTICS-GENERAL telemetry block (20 bytes per ICD Table 12-19)
  *
- * Block format (~20 bytes):
- *   [tick_count:4]      // Physics tick count
- *   [uptime_seconds:4]  // Uptime in seconds
- *   [fault_count:4]     // Total fault occurrences (TBD)
- *   [command_count:4]   // Total commands processed (TBD)
- *   [max_jitter_us:2]   // Max jitter (µs)
+ * Block format (20 bytes):
+ *   [uptime_counter:4]        // Uptime counter (UQ30.2 seconds)
+ *   [revolution_count:4]      // Revolution count (32-bit unsigned)
+ *   [hall_invalid_count:4]    // Hall sensor invalid transition count (32-bit unsigned)
+ *   [drive_fault_count:4]     // Drive-Fault count (32-bit unsigned)
+ *   [drive_overtemp_count:4]  // Drive-Overtemperature count (32-bit unsigned)
  *
  * @param state Pointer to wheel state
  * @param buffer Output buffer
  * @param buffer_size Buffer size
- * @return Block size in bytes
+ * @return Block size in bytes (20)
  */
 uint16_t telemetry_build_diagnostics(const wheel_state_t* state, uint8_t* buffer, uint16_t buffer_size);
 

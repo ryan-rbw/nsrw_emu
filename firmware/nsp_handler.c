@@ -215,8 +215,18 @@ void nsp_handler_poll(void) {
                 printf("[NSP] Command executed successfully\n");
             }
 
-            // If Poll bit set, send reply
+            // If Poll bit set, send reply (unless command indicates NO_REPLY)
             if (nsp_is_poll_set(packet.ctrl)) {
+                // ICD compliance: Check for CMD_NO_REPLY (e.g., TRIP-LCL success)
+                // Per ICD, some commands (like TRIP-LCL) should not send a reply
+                if (result.status == CMD_NO_REPLY) {
+                    if (debug_rx) {
+                        printf("[NSP] CMD_NO_REPLY: suppressing reply per ICD\n");
+                    }
+                    slip_decoder_reset(&slip_decoder);
+                    continue;
+                }
+
                 uint8_t nsp_reply[NSP_MAX_PACKET_SIZE];
                 size_t nsp_reply_len;
 

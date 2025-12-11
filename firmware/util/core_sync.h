@@ -39,6 +39,8 @@ typedef enum {
     CMD_SET_PWM,            // Set PWM duty cycle (PWM mode)
     CMD_CLEAR_FAULT,        // Clear latched faults
     CMD_RESET,              // Soft reset
+    CMD_TRIP_LCL,           // Test LCL trip (ICD TRIP-LCL command)
+    CMD_CONFIG_PROTECTION,  // Configure protection enable mask (ICD CONFIGURE-PROTECTION)
 } command_type_t;
 
 /**
@@ -109,7 +111,7 @@ void core_sync_init(void);
 // ============================================================================
 
 /**
- * @brief Send command from Core0 to Core1
+ * @brief Send command from Core0 to Core1 (non-blocking)
  *
  * Writes command to mailbox (spinlock-protected). Returns false if
  * previous command is still pending.
@@ -120,6 +122,27 @@ void core_sync_init(void);
  * @return true if command was sent, false if mailbox full
  */
 bool core_sync_send_command(command_type_t type, float param1, float param2);
+
+/** Default timeout for command retry (50ms = 5 physics ticks at 100Hz) */
+#define CORE_SYNC_CMD_TIMEOUT_US  50000
+
+/** Retry interval between attempts (1ms) */
+#define CORE_SYNC_CMD_RETRY_US    1000
+
+/**
+ * @brief Send command from Core0 to Core1 with retry/wait
+ *
+ * Attempts to send command to mailbox, retrying with small delays if
+ * the mailbox is full. This allows Core1 time to consume the previous
+ * command. Use this when command delivery is critical.
+ *
+ * @param type Command type
+ * @param param1 Primary parameter (mode, speed, current, etc.)
+ * @param param2 Secondary parameter (reserved)
+ * @param timeout_us Maximum time to wait for mailbox (0 = use default 50ms)
+ * @return true if command was sent, false if timeout expired
+ */
+bool core_sync_send_command_blocking(command_type_t type, float param1, float param2, uint32_t timeout_us);
 
 /**
  * @brief Read command from Core1 (called by Core1 physics loop)
